@@ -1,51 +1,59 @@
-import jwt, { SignOptions } from "jsonwebtoken";
+import jwt from "jsonwebtoken";
 import config from "../config/env";
 
-interface TokenPayload {
-  userId: string;
+export interface ITokenPayload {
+  id: string;
   email: string;
   role: string;
 }
 
-/**
- * Generate JWT access token
- * @param payload - Token payload
- * @returns JWT token
- */
-export const generateAccessToken = (payload: TokenPayload): string => {
-  return jwt.sign(payload, config.jwtSecret, {
-    expiresIn: config.jwtAccessExpiration,
-  } as SignOptions);
-};
+export interface IDecodedToken extends ITokenPayload {
+  iat: number;
+  exp: number;
+}
 
-/**
- * Generate JWT refresh token
- * @param payload - Token payload
- * @returns JWT refresh token
- */
-export const generateRefreshToken = (payload: TokenPayload): string => {
-  return jwt.sign(payload, config.jwtSecret, {
-    expiresIn: config.jwtRefreshExpiration,
-  } as SignOptions);
-};
+export class JwtService {
+  static generateAccessToken(payload: ITokenPayload): string {
+    return jwt.sign(payload, config.jwtSecret, {
+      expiresIn: config.jwtAccessExpiration,
+    });
+  }
 
-/**
- * Verify JWT token
- * @param token - JWT token
- * @returns Decoded token payload
- */
-export const verifyToken = (token: string): TokenPayload => {
-  return jwt.verify(token, config.jwtSecret) as TokenPayload;
-};
+  static generateRefreshToken(payload: ITokenPayload): string {
+    return jwt.sign(payload, config.jwtSecret, {
+      expiresIn: config.jwtRefreshExpiration,
+    });
+  }
 
-/**
- * Generate both access and refresh tokens
- * @param payload - Token payload
- * @returns Object with access and refresh tokens
- */
-export const generateTokens = (payload: TokenPayload) => {
-  return {
-    accessToken: generateAccessToken(payload),
-    refreshToken: generateRefreshToken(payload),
-  };
-};
+  static verifyToken(token: string): IDecodedToken {
+    try {
+      return jwt.verify(token, config.jwtSecret) as IDecodedToken;
+    } catch (error: any) {
+      throw new Error(`Invalid token: ${error.message}`);
+    }
+  }
+
+  static decodeToken(token: string): IDecodedToken | null {
+    try {
+      return jwt.decode(token) as IDecodedToken;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  static generateTokenPair(payload: ITokenPayload) {
+    return {
+      accessToken: this.generateAccessToken(payload),
+      refreshToken: this.generateRefreshToken(payload),
+    };
+  }
+}
+
+// Backwards compatibility
+export const generateAccessToken = (payload: ITokenPayload) =>
+  JwtService.generateAccessToken(payload);
+export const generateRefreshToken = (payload: ITokenPayload) =>
+  JwtService.generateRefreshToken(payload);
+export const verifyToken = (token: string) => JwtService.verifyToken(token);
+export const generateTokens = (payload: ITokenPayload) =>
+  JwtService.generateTokenPair(payload);

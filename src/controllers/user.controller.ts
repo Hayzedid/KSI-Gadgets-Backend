@@ -1,145 +1,122 @@
-import { Request, Response, NextFunction } from "express";
-import userService from "../services/user.service";
+import { Response } from "express";
+import { IAuthRequest } from "../middlewares/auth.middleware";
+import { userService } from "../services/user.service";
+import { ApiResponse } from "../utils/ApiResponse";
 import { asyncHandler } from "../utils/asyncHandler";
-import ApiResponse from "../utils/ApiResponse";
-import httpStatus from "../constants/httpStatus";
 
-/**
- * Get user profile
- * @route GET /api/users/profile
- * @access Private
- */
-export const getProfile = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
-    const userId = req.user!.userId;
+export class UserController {
+  static getProfile = asyncHandler(async (req: IAuthRequest, res: Response) => {
+    const userId = req.user?.id;
 
-    const user = await userService.getProfile(userId);
+    if (!userId) {
+      throw new Error("User ID not found");
+    }
 
-    res
-      .status(httpStatus.OK)
-      .json(
-        new ApiResponse(httpStatus.OK, user, "Profile retrieved successfully")
-      );
-  }
-);
+    const user = await userService.getUserById(userId);
 
-/**
- * Update user profile
- * @route PUT /api/users/profile
- * @access Private
- */
-export const updateProfile = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
-    const userId = req.user!.userId;
-    const { name, phone, address } = req.body;
+    return res
+      .status(200)
+      .json(new ApiResponse(200, user, "User profile retrieved successfully"));
+  });
 
-    const user = await userService.updateProfile(userId, {
-      name,
-      phone,
-      address,
-    });
+  static updateProfile = asyncHandler(
+    async (req: IAuthRequest, res: Response) => {
+      const userId = req.user?.id;
 
-    res
-      .status(httpStatus.OK)
-      .json(
-        new ApiResponse(httpStatus.OK, user, "Profile updated successfully")
-      );
-  }
-);
+      if (!userId) {
+        throw new Error("User ID not found");
+      }
 
-/**
- * Delete user account
- * @route DELETE /api/users/account
- * @access Private
- */
-export const deleteAccount = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
-    const userId = req.user!.userId;
+      const { name, phone, address } = req.body;
 
-    const result = await userService.deleteAccount(userId);
+      const updatedUser = await userService.updateUserProfile(userId, {
+        name,
+        phone,
+        address,
+      });
 
-    res
-      .status(httpStatus.OK)
-      .json(
-        new ApiResponse(httpStatus.OK, result, "Account deleted successfully")
-      );
-  }
-);
+      return res
+        .status(200)
+        .json(
+          new ApiResponse(200, updatedUser, "Profile updated successfully")
+        );
+    }
+  );
 
-/**
- * Get all users (Admin)
- * @route GET /api/users
- * @access Private/Admin
- */
-export const getAllUsers = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 10;
+  static deleteAccount = asyncHandler(
+    async (req: IAuthRequest, res: Response) => {
+      const userId = req.user?.id;
 
-    const result = await userService.getAllUsers(page, limit);
+      if (!userId) {
+        throw new Error("User ID not found");
+      }
 
-    res
-      .status(httpStatus.OK)
-      .json(
-        new ApiResponse(httpStatus.OK, result, "Users retrieved successfully")
-      );
-  }
-);
+      await userService.deleteUserAccount(userId);
 
-/**
- * Get user by ID (Admin)
- * @route GET /api/users/:id
- * @access Private/Admin
- */
-export const getUserById = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
-    const { id } = req.params;
+      return res
+        .status(200)
+        .json(new ApiResponse(200, null, "Account deleted successfully"));
+    }
+  );
 
-    const user = await userService.getUserById(id);
+  // Admin endpoints
+  static getAllUsers = asyncHandler(
+    async (req: IAuthRequest, res: Response) => {
+      const { skip = 0, take = 10 } = req.query;
 
-    res
-      .status(httpStatus.OK)
-      .json(
-        new ApiResponse(httpStatus.OK, user, "User retrieved successfully")
-      );
-  }
-);
+      const result = await userService.getAllUsers(Number(skip), Number(take));
 
-/**
- * Update user role (Admin)
- * @route PATCH /api/users/:id/role
- * @access Private/Admin
- */
-export const updateUserRole = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
-    const { id } = req.params;
-    const { role } = req.body;
+      return res
+        .status(200)
+        .json(new ApiResponse(200, result, "Users retrieved successfully"));
+    }
+  );
 
-    const user = await userService.updateUserRole(id, role);
+  static getUserById = asyncHandler(
+    async (req: IAuthRequest, res: Response) => {
+      const { userId } = req.params;
 
-    res
-      .status(httpStatus.OK)
-      .json(
-        new ApiResponse(httpStatus.OK, user, "User role updated successfully")
-      );
-  }
-);
+      const user = await userService.getUserById(userId);
 
-/**
- * Delete user (Admin)
- * @route DELETE /api/users/:id
- * @access Private/Admin
- */
-export const deleteUser = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
-    const { id } = req.params;
+      return res
+        .status(200)
+        .json(new ApiResponse(200, user, "User retrieved successfully"));
+    }
+  );
 
-    const result = await userService.deleteUser(id);
+  static deactivateUser = asyncHandler(
+    async (req: IAuthRequest, res: Response) => {
+      const { userId } = req.params;
 
-    res
-      .status(httpStatus.OK)
-      .json(
-        new ApiResponse(httpStatus.OK, result, "User deleted successfully")
-      );
-  }
-);
+      await userService.deactivateUser(userId);
+
+      return res
+        .status(200)
+        .json(new ApiResponse(200, null, "User deactivated successfully"));
+    }
+  );
+
+  static reactivateUser = asyncHandler(
+    async (req: IAuthRequest, res: Response) => {
+      const { userId } = req.params;
+
+      await userService.reactivateUser(userId);
+
+      return res
+        .status(200)
+        .json(new ApiResponse(200, null, "User reactivated successfully"));
+    }
+  );
+
+  static deleteUser = asyncHandler(async (req: IAuthRequest, res: Response) => {
+    const { userId } = req.params;
+
+    await userService.deleteUserAccount(userId);
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, null, "User deleted successfully"));
+  });
+}
+
+export default UserController;

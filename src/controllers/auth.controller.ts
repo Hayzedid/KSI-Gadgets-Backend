@@ -1,159 +1,103 @@
-import { Request, Response, NextFunction } from "express";
-import authService from "../services/auth.service";
+import { Response } from "express";
+import { IAuthRequest } from "../middlewares/auth.middleware";
+import { authService } from "../services/auth.service";
+import { ApiResponse } from "../utils/ApiResponse";
 import { asyncHandler } from "../utils/asyncHandler";
-import ApiResponse from "../utils/ApiResponse";
-import httpStatus from "../constants/httpStatus";
 
-/**
- * Register a new user
- * @route POST /api/auth/register
- * @access Public
- */
-export const register = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
+export class AuthController {
+  static register = asyncHandler(async (req: IAuthRequest, res: Response) => {
     const { name, email, password, phone } = req.body;
 
-    const result = await authService.register({ name, email, password, phone });
+    const result = await authService.register({
+      name,
+      email,
+      password,
+      phone,
+    });
 
-    res
-      .status(httpStatus.CREATED)
-      .json(
-        new ApiResponse(httpStatus.CREATED, result, "Registration successful")
-      );
-  }
-);
+    return res
+      .status(201)
+      .json(new ApiResponse(201, result, "User registered successfully"));
+  });
 
-/**
- * Login user
- * @route POST /api/auth/login
- * @access Public
- */
-export const login = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
+  static login = asyncHandler(async (req: IAuthRequest, res: Response) => {
     const { email, password } = req.body;
 
-    const result = await authService.login({ email, password });
+    const result = await authService.login({
+      email,
+      password,
+    });
 
-    res
-      .status(httpStatus.OK)
-      .json(new ApiResponse(httpStatus.OK, result, "Login successful"));
-  }
-);
+    // Set refresh token as httpOnly cookie (optional)
+    res.cookie("refreshToken", result.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
 
-/**
- * Refresh access token
- * @route POST /api/auth/refresh-token
- * @access Public
- */
-export const refreshToken = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
-    const { refreshToken } = req.body;
-
-    const tokens = await authService.refreshToken(refreshToken);
-
-    res
-      .status(httpStatus.OK)
-      .json(
-        new ApiResponse(httpStatus.OK, tokens, "Token refreshed successfully")
-      );
-  }
-);
-
-/**
- * Logout user
- * @route POST /api/auth/logout
- * @access Private
- */
-export const logout = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
-    const userId = req.user!.userId;
-
-    const result = await authService.logout(userId);
-
-    res
-      .status(httpStatus.OK)
-      .json(new ApiResponse(httpStatus.OK, result, "Logout successful"));
-  }
-);
-
-/**
- * Request password reset
- * @route POST /api/auth/forgot-password
- * @access Public
- */
-export const forgotPassword = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
-    const { email } = req.body;
-
-    const result = await authService.requestPasswordReset(email);
-
-    res
-      .status(httpStatus.OK)
-      .json(
-        new ApiResponse(httpStatus.OK, result, "Password reset email sent")
-      );
-  }
-);
-
-/**
- * Reset password with token
- * @route POST /api/auth/reset-password
- * @access Public
- */
-export const resetPassword = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
-    const { token, newPassword } = req.body;
-
-    const result = await authService.resetPassword(token, newPassword);
-
-    res
-      .status(httpStatus.OK)
-      .json(
-        new ApiResponse(httpStatus.OK, result, "Password reset successful")
-      );
-  }
-);
-
-/**
- * Change password
- * @route POST /api/auth/change-password
- * @access Private
- */
-export const changePassword = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
-    const userId = req.user!.userId;
-    const { currentPassword, newPassword } = req.body;
-
-    const result = await authService.changePassword(
-      userId,
-      currentPassword,
-      newPassword
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        {
+          user: result.user,
+          accessToken: result.accessToken,
+        },
+        "Login successful"
+      )
     );
+  });
 
-    res
-      .status(httpStatus.OK)
-      .json(
-        new ApiResponse(httpStatus.OK, result, "Password changed successfully")
-      );
-  }
-);
+  static refreshToken = asyncHandler(
+    async (req: IAuthRequest, res: Response) => {
+      const { refreshToken } = req.body;
 
-/**
- * Get current user
- * @route GET /api/auth/me
- * @access Private
- */
-export const getCurrentUser = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
-    const userId = req.user!.userId;
+      if (!refreshToken) {
+        // Try to get from cookie
+        const cookieToken = req.cookies?.refreshToken;
+        if (!cookieToken) {
+          throw new Error("Refresh token required");
+        }
 
-    const userService = require("../services/user.service").default;
-    const user = await userService.getProfile(userId);
+        const tokens = await authService.refreshAccessToken(cookieToken);
+        return res
+          .status(200)
+          .json(new ApiResponse(200, tokens, "Token refreshed successfully"));
+      }
 
-    res
-      .status(httpStatus.OK)
-      .json(
-        new ApiResponse(httpStatus.OK, user, "User retrieved successfully")
-      );
-  }
-);
+      const tokens = await authService.refreshAccessToken(refreshToken);
+
+      return res
+        .status(200)
+        .json(new ApiResponse(200, tokens, "Token refreshed successfully"));
+    }
+  );
+
+  static changePassword = asyncHandler(
+    async (req: IAuthRequest, res: Response) => {
+      const userId = req.user?.id;
+      const { oldPassword, newPassword } = req.body;
+
+      if (!userId) {
+        throw new Error("User ID not found");
+      }
+
+      await authService.changePassword(userId, oldPassword, newPassword);
+
+      return res
+        .status(200)
+        .json(new ApiResponse(200, null, "Password changed successfully"));
+    }
+  );
+
+  static logout = asyncHandler(async (req: IAuthRequest, res: Response) => {
+    // Clear refresh token cookie
+    res.clearCookie("refreshToken");
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, null, "Logout successful"));
+  });
+}
+
+export default AuthController;

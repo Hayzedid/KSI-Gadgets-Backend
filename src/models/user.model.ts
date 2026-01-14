@@ -4,75 +4,44 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-  BeforeInsert,
-  BeforeUpdate,
 } from "typeorm";
-import { hashPassword } from "../utils/password";
+
+export enum UserRole {
+  CUSTOMER = "customer",
+  ADMIN = "admin",
+}
 
 @Entity("users")
 export class User {
   @PrimaryGeneratedColumn("uuid")
   id: string;
 
-  @Column({ type: "varchar", length: 50 })
+  @Column({ type: "varchar", length: 100 })
   name: string;
 
   @Column({ type: "varchar", unique: true, length: 100 })
   email: string;
 
-  @Column({ type: "varchar", select: false })
+  @Column({ type: "varchar" })
   password: string;
 
-  @Column({ type: "enum", enum: ["customer", "admin"], default: "customer" })
-  role: "customer" | "admin";
+  @Column({ type: "enum", enum: UserRole, default: UserRole.CUSTOMER })
+  role: UserRole;
 
   @Column({ type: "varchar", nullable: true })
-  phone: string | null;
+  phone?: string;
 
-  @Column({ type: "jsonb", nullable: true })
-  address: {
-    street?: string;
-    city?: string;
-    state?: string;
-    zipCode?: string;
-    country?: string;
-  } | null;
+  @Column({ type: "varchar", nullable: true, length: 500 })
+  address?: string;
 
-  @Column({ type: "boolean", default: false })
-  isEmailVerified: boolean;
-
-  @Column({ type: "varchar", nullable: true, select: false })
-  resetPasswordToken: string | null;
-
-  @Column({ type: "timestamp", nullable: true, select: false })
-  resetPasswordExpires: Date | null;
-
-  @Column({ type: "text", nullable: true, select: false })
-  refreshToken: string | null;
+  @Column({ type: "boolean", default: true })
+  isActive: boolean;
 
   @CreateDateColumn()
   createdAt: Date;
 
   @UpdateDateColumn()
   updatedAt: Date;
-
-  // Track if password was modified
-  private passwordModified: boolean = false;
-
-  @BeforeInsert()
-  @BeforeUpdate()
-  async hashPasswordBeforeSave() {
-    if (this.passwordModified && this.password) {
-      this.password = await hashPassword(this.password);
-      this.passwordModified = false;
-    }
-  }
-
-  // Method to mark password as modified
-  setPassword(password: string) {
-    this.password = password;
-    this.passwordModified = true;
-  }
 }
 
 export default User;

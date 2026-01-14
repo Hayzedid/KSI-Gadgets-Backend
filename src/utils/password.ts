@@ -1,24 +1,65 @@
 import bcrypt from "bcryptjs";
 
-/**
- * Hash a password
- * @param password - Plain text password
- * @returns Hashed password
- */
-export const hashPassword = async (password: string): Promise<string> => {
-  const salt = await bcrypt.genSalt(10);
-  return bcrypt.hash(password, salt);
-};
+const SALT_ROUNDS = 10;
 
-/**
- * Compare password with hash
- * @param password - Plain text password
- * @param hashedPassword - Hashed password
- * @returns True if passwords match
- */
-export const comparePassword = async (
-  password: string,
-  hashedPassword: string
-): Promise<boolean> => {
-  return bcrypt.compare(password, hashedPassword);
-};
+export class PasswordService {
+  static async hashPassword(password: string): Promise<string> {
+    try {
+      const salt = await bcrypt.genSalt(SALT_ROUNDS);
+      return await bcrypt.hash(password, salt);
+    } catch (error) {
+      throw new Error("Error hashing password");
+    }
+  }
+
+  static async comparePassword(
+    plainPassword: string,
+    hashedPassword: string
+  ): Promise<boolean> {
+    try {
+      return await bcrypt.compare(plainPassword, hashedPassword);
+    } catch (error) {
+      throw new Error("Error comparing passwords");
+    }
+  }
+
+  static validatePassword(password: string): {
+    isValid: boolean;
+    errors: string[];
+  } {
+    const errors: string[] = [];
+
+    if (password.length < 8) {
+      errors.push("Password must be at least 8 characters long");
+    }
+
+    if (!/[A-Z]/.test(password)) {
+      errors.push("Password must contain at least one uppercase letter");
+    }
+
+    if (!/[a-z]/.test(password)) {
+      errors.push("Password must contain at least one lowercase letter");
+    }
+
+    if (!/\d/.test(password)) {
+      errors.push("Password must contain at least one digit");
+    }
+
+    if (!/[!@#$%^&*]/.test(password)) {
+      errors.push(
+        "Password must contain at least one special character (!@#$%^&*)"
+      );
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+    };
+  }
+}
+
+// Backwards compatibility
+export const hashPassword = (password: string) =>
+  PasswordService.hashPassword(password);
+export const comparePassword = (password: string, hash: string) =>
+  PasswordService.comparePassword(password, hash);

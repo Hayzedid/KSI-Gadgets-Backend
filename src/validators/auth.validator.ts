@@ -1,32 +1,35 @@
 import { body } from "express-validator";
 
-/**
- * Validation schema for user registration
- */
-export const registerSchema = [
+export const registerValidator = [
   body("name")
     .trim()
     .notEmpty()
     .withMessage("Name is required")
-    .isLength({ min: 2, max: 50 })
-    .withMessage("Name must be between 2 and 50 characters"),
+    .isLength({ min: 2, max: 100 })
+    .withMessage("Name must be between 2 and 100 characters"),
 
   body("email")
     .trim()
     .notEmpty()
     .withMessage("Email is required")
     .isEmail()
-    .withMessage("Please provide a valid email")
+    .withMessage("Please provide a valid email address")
     .normalizeEmail(),
 
   body("password")
     .notEmpty()
     .withMessage("Password is required")
-    .isLength({ min: 6 })
-    .withMessage("Password must be at least 6 characters")
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+    .isLength({ min: 8 })
+    .withMessage("Password must be at least 8 characters long")
+    .matches(/[A-Z]/)
+    .withMessage("Password must contain at least one uppercase letter")
+    .matches(/[a-z]/)
+    .withMessage("Password must contain at least one lowercase letter")
+    .matches(/\d/)
+    .withMessage("Password must contain at least one digit")
+    .matches(/[!@#$%^&*]/)
     .withMessage(
-      "Password must contain at least one uppercase letter, one lowercase letter, and one number"
+      "Password must contain at least one special character (!@#$%^&*)"
     ),
 
   body("phone")
@@ -36,79 +39,41 @@ export const registerSchema = [
     .withMessage("Please provide a valid phone number"),
 ];
 
-/**
- * Validation schema for user login
- */
-export const loginSchema = [
+export const loginValidator = [
   body("email")
     .trim()
     .notEmpty()
     .withMessage("Email is required")
     .isEmail()
-    .withMessage("Please provide a valid email")
+    .withMessage("Please provide a valid email address")
     .normalizeEmail(),
 
   body("password").notEmpty().withMessage("Password is required"),
 ];
 
-/**
- * Validation schema for refresh token
- */
-export const refreshTokenSchema = [
-  body("refreshToken").notEmpty().withMessage("Refresh token is required"),
-];
-
-/**
- * Validation schema for forgot password
- */
-export const forgotPasswordSchema = [
-  body("email")
-    .trim()
+export const refreshTokenValidator = [
+  body("refreshToken")
+    .optional()
     .notEmpty()
-    .withMessage("Email is required")
-    .isEmail()
-    .withMessage("Please provide a valid email")
-    .normalizeEmail(),
+    .withMessage("Refresh token is required"),
 ];
 
-/**
- * Validation schema for reset password
- */
-export const resetPasswordSchema = [
-  body("token").notEmpty().withMessage("Reset token is required"),
+export const changePasswordValidator = [
+  body("oldPassword").notEmpty().withMessage("Current password is required"),
 
   body("newPassword")
     .notEmpty()
     .withMessage("New password is required")
-    .isLength({ min: 6 })
-    .withMessage("Password must be at least 6 characters")
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+    .isLength({ min: 8 })
+    .withMessage("New password must be at least 8 characters long")
+    .matches(/[A-Z]/)
+    .withMessage("New password must contain at least one uppercase letter")
+    .matches(/[a-z]/)
+    .withMessage("New password must contain at least one lowercase letter")
+    .matches(/\d/)
+    .withMessage("New password must contain at least one digit")
+    .matches(/[!@#$%^&*]/)
     .withMessage(
-      "Password must contain at least one uppercase letter, one lowercase letter, and one number"
+      "New password must contain at least one special character (!@#$%^&*)"
     ),
-];
-
-/**
- * Validation schema for change password
- */
-export const changePasswordSchema = [
-  body("currentPassword")
-    .notEmpty()
-    .withMessage("Current password is required"),
-
-  body("newPassword")
-    .notEmpty()
-    .withMessage("New password is required")
-    .isLength({ min: 6 })
-    .withMessage("Password must be at least 6 characters")
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
-    .withMessage(
-      "Password must contain at least one uppercase letter, one lowercase letter, and one number"
-    )
-    .custom((value, { req }) => {
-      if (value === req.body.currentPassword) {
-        throw new Error("New password must be different from current password");
-      }
-      return true;
-    }),
 ];

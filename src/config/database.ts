@@ -1,6 +1,11 @@
 import { DataSource } from "typeorm";
 import config from "./env";
 import { User } from "../models/user.model";
+import { Product } from "../models/product.model";
+import { Review } from "../models/review.model";
+import { Cart } from "../models/cart.model";
+import { CartItem } from "../models/cart-item.model";
+import { Order } from "../models/order.model";
 
 export const AppDataSource = new DataSource({
   type: "postgres",
@@ -11,7 +16,7 @@ export const AppDataSource = new DataSource({
   database: config.dbName,
   synchronize: config.env === "development", // Auto-create tables in development
   logging: config.env === "development",
-  entities: [User],
+  entities: [User, Product, Review, Cart, CartItem, Order],
   migrations: ["src/migrations/**/*.ts"],
   subscribers: [],
 });

@@ -1,135 +1,155 @@
 import { AppDataSource } from "../config/database";
-import User from "../models/user.model";
-import ApiError from "../utils/ApiError";
-import httpStatus from "../constants/httpStatus";
+import { User } from "../models/user.model";
+import { ApiError } from "../utils/ApiError";
 
-interface UpdateProfileData {
+export interface IUpdateProfileDTO {
   name?: string;
   phone?: string;
-  address?: {
-    street?: string;
-    city?: string;
-    state?: string;
-    zipCode?: string;
-    country?: string;
-  };
+  address?: string;
 }
 
-class UserService {
+export interface IUserProfile {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  address?: string;
+  role: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export class UserService {
   private userRepository = AppDataSource.getRepository(User);
 
-  /**
-   * Get user profile
-   */
-  async getProfile(userId: string) {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
+  async getUserById(userId: string): Promise<IUserProfile> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+
     if (!user) {
-      throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+      throw new ApiError("User not found", 404);
     }
 
-    return user;
+    return this.formatUserProfile(user);
   }
 
-  /**
-   * Update user profile
-   */
-  async updateProfile(userId: string, updateData: UpdateProfileData) {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) {
-      throw new ApiError(httpStatus.NOT_FOUND, "User not found");
-    }
+  async getUserByEmail(email: string): Promise<IUserProfile | null> {
+    const user = await this.userRepository.findOne({
+      where: { email },
+    });
 
-    // Update fields
-    if (updateData.name) user.name = updateData.name;
-    if (updateData.phone) user.phone = updateData.phone;
-    if (updateData.address) {
-      user.address = {
-        ...user.address,
-        ...updateData.address,
-      };
-    }
-
-    await this.userRepository.save(user);
-
-    return user;
+    return user ? this.formatUserProfile(user) : null;
   }
 
-  /**
-   * Delete user account
-   */
-  async deleteAccount(userId: string) {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
+  async updateUserProfile(
+    userId: string,
+    dto: IUpdateProfileDTO
+  ): Promise<IUserProfile> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+
     if (!user) {
-      throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+      throw new ApiError("User not found", 404);
     }
 
-    await this.userRepository.remove(user);
+    // Update allowed fields
+    if (dto.name !== undefined) {
+      user.name = dto.name;
+    }
+    if (dto.phone !== undefined) {
+      user.phone = dto.phone;
+    }
+    if (dto.address !== undefined) {
+      user.address = dto.address;
+    }
 
-    return { message: "Account deleted successfully" };
+    user.updatedAt = new Date();
+    const updatedUser = await this.userRepository.save(user);
+
+    return this.formatUserProfile(updatedUser);
   }
 
-  /**
-   * Get all users (Admin only)
-   */
-  async getAllUsers(page: number = 1, limit: number = 10) {
-    const skip = (page - 1) * limit;
-
+  async getAllUsers(
+    skip: number = 0,
+    take: number = 10
+  ): Promise<{ users: IUserProfile[]; total: number }> {
     const [users, total] = await this.userRepository.findAndCount({
       skip,
-      take: limit,
+      take,
       order: { createdAt: "DESC" },
     });
 
     return {
-      users,
-      pagination: {
-        total,
-        page,
-        pages: Math.ceil(total / limit),
-      },
+      users: users.map((user) => this.formatUserProfile(user)),
+      total,
     };
   }
 
-  /**
-   * Get user by ID (Admin only)
-   */
-  async getUserById(userId: string) {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
+  async deactivateUser(userId: string): Promise<void> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+
     if (!user) {
-      throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+      throw new ApiError("User not found", 404);
     }
 
-    return user;
-  }
-
-  /**
-   * Update user role (Admin only)
-   */
-  async updateUserRole(userId: string, role: "customer" | "admin") {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) {
-      throw new ApiError(httpStatus.NOT_FOUND, "User not found");
-    }
-
-    user.role = role;
+    user.isActive = false;
+    user.updatedAt = new Date();
     await this.userRepository.save(user);
-
-    return user;
   }
 
-  /**
-   * Delete user (Admin only)
-   */
-  async deleteUser(userId: string) {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
+  async reactivateUser(userId: string): Promise<void> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+
     if (!user) {
-      throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+      throw new ApiError("User not found", 404);
     }
 
-    await this.userRepository.remove(user);
+    user.isActive = true;
+    user.updatedAt = new Date();
+    await this.userRepository.save(user);
+  }
 
-    return { message: "User deleted successfully" };
+  async deleteUserAccount(userId: string): Promise<void> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new ApiError("User not found", 404);
+    }
+
+    // Soft delete by marking as inactive, or hard delete if required
+    await this.userRepository.remove(user);
+  }
+
+  async checkEmailExists(email: string): Promise<boolean> {
+    const user = await this.userRepository.findOne({
+      where: { email },
+    });
+
+    return !!user;
+  }
+
+  private formatUserProfile(user: User): IUserProfile {
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      address: user.address,
+      role: user.role,
+      isActive: user.isActive,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
   }
 }
 
-export default new UserService();
+export const userService = new UserService();

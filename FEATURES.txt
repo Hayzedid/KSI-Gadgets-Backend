@@ -80,7 +80,7 @@ CORE FEATURES
 
 9. INFRASTRUCTURE
 -----------------
-   - Database configuration (MongoDB)
+   - Database configuration 
    - Logging system
    - Environment configuration
    - API documentation

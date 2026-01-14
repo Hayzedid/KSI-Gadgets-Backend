@@ -1,71 +1,57 @@
 import { Router } from "express";
-import * as userController from "../controllers/user.controller";
+import UserController from "../controllers/user.controller";
 import { authenticate, authorize } from "../middlewares/auth.middleware";
+import {
+  updateProfileValidator,
+  userIdValidator,
+} from "../validators/user.validator";
 import { validate } from "../middlewares/validation.middleware";
-import * as userValidator from "../validators/user.validator";
+import { UserRole } from "../models/user.model";
 
 const router = Router();
 
 // All routes require authentication
 router.use(authenticate);
 
-/**
- * @route   GET /api/users/profile
- * @desc    Get user profile
- * @access  Private
- */
-router.get("/profile", userController.getProfile);
-
-/**
- * @route   PUT /api/users/profile
- * @desc    Update user profile
- * @access  Private
- */
+// Customer routes
+router.get("/profile", UserController.getProfile);
 router.put(
   "/profile",
-  validate(userValidator.updateProfileSchema),
-  userController.updateProfile
+  updateProfileValidator,
+  validate,
+  UserController.updateProfile
 );
-
-/**
- * @route   DELETE /api/users/account
- * @desc    Delete user account
- * @access  Private
- */
-router.delete("/account", userController.deleteAccount);
+router.delete("/account", UserController.deleteAccount);
 
 // Admin routes
-/**
- * @route   GET /api/users
- * @desc    Get all users
- * @access  Private/Admin
- */
-router.get("/", authorize("admin"), userController.getAllUsers);
-
-/**
- * @route   GET /api/users/:id
- * @desc    Get user by ID
- * @access  Private/Admin
- */
-router.get("/:id", authorize("admin"), userController.getUserById);
-
-/**
- * @route   PATCH /api/users/:id/role
- * @desc    Update user role
- * @access  Private/Admin
- */
-router.patch(
-  "/:id/role",
-  authorize("admin"),
-  validate(userValidator.updateRoleSchema),
-  userController.updateUserRole
+router.get("/", authorize(UserRole.ADMIN), UserController.getAllUsers);
+router.get(
+  "/:userId",
+  authorize(UserRole.ADMIN),
+  userIdValidator,
+  validate,
+  UserController.getUserById
 );
-
-/**
- * @route   DELETE /api/users/:id
- * @desc    Delete user
- * @access  Private/Admin
- */
-router.delete("/:id", authorize("admin"), userController.deleteUser);
+router.put(
+  "/:userId/deactivate",
+  authorize(UserRole.ADMIN),
+  userIdValidator,
+  validate,
+  UserController.deactivateUser
+);
+router.put(
+  "/:userId/reactivate",
+  authorize(UserRole.ADMIN),
+  userIdValidator,
+  validate,
+  UserController.reactivateUser
+);
+router.delete(
+  "/:userId",
+  authorize(UserRole.ADMIN),
+  userIdValidator,
+  validate,
+  UserController.deleteUser
+);
 
 export default router;

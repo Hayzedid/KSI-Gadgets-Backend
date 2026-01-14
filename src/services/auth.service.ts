@@ -1,99 +1,134 @@
 import { AppDataSource } from "../config/database";
-import User from "../models/user.model";
-import { comparePassword } from "../utils/password";
-import { generateTokens, verifyToken } from "../utils/jwt";
-import ApiError from "../utils/ApiError";
-import httpStatus from "../constants/httpStatus";
-import crypto from "crypto";
-import { MoreThan } from "typeorm";
+import { User, UserRole } from "../models/user.model";
+import { PasswordService } from "../utils/password";
 
-interface RegisterData {
+export interface IRegisterDTO {
   name: string;
   email: string;
   password: string;
   phone?: string;
 }
 
-interface LoginData {
+export interface ILoginDTO {
   email: string;
   password: string;
 }
 
-class AuthService {
+export interface IAuthResponse {
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    role: UserRole;
+    phone?: string;
+  };
+  accessToken: string;
+  refreshToken: string;
+}
+
+export class AuthService {
   private userRepository = AppDataSource.getRepository(User);
 
-  /**
-   * Register a new user
-   */
-  async register(userData: RegisterData) {
-    // Check if user already exists
+  async register(dto: IRegisterDTO): Promise<IAuthResponse> {
+    // Check if email already exists
     const existingUser = await this.userRepository.findOne({
-      where: { email: userData.email },
+      where: { email: dto.email },
     });
+
     if (existingUser) {
-      throw new ApiError(httpStatus.BAD_REQUEST, "Email already registered");
+      throw new ApiError("Email already registered", 400, [
+        "This email is already in use",
+      ]);
     }
 
-    // Create new user
-    const user = this.userRepository.create(userData);
-    user.setPassword(userData.password);
-    await this.userRepository.save(user);
+    // Validate password strength
+    const passwordValidation = PasswordService.validatePassword(dto.password);
+    if (!passwordValidation.isValid) {
+      throw new ApiError(
+        "Password does not meet requirements",
+        400,
+        passwordValidation.errors
+      );
+    }
 
-    // Generate tokens
-    const tokens = generateTokens({
-      userId: user.id,
-      email: user.email,
-      role: user.role,
+    // Hash password
+    const hashedPassword = await PasswordService.hashPassword(dto.password);
+
+    // Create user
+    const user = this.userRepository.create({
+      name: dto.name,
+      email: dto.email,
+      password: hashedPassword,
+      phone: dto.phone,
+      role: UserRole.CUSTOMER,
+      isActive: true,
     });
 
-    // Save refresh token
-    user.refreshToken = tokens.refreshToken;
-    await this.userRepository.save(user);
+    const savedUser = await this.userRepository.save(user);
+
+    // Generate tokens
+    const tokenPayload: ITokenPayload = {
+      id: savedUser.id,
+      email: savedUser.email,
+      role: savedUser.role,
+    };
+
+    const { accessToken, refreshToken } =
+      JwtService.generateTokenPair(tokenPayload);
 
     return {
       user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
+        id: savedUser.id,
+        name: savedUser.name,
+        email: savedUser.email,
+        role: savedUser.role,
+        phone: savedUser.phone,
       },
-      tokens,
+      accessToken,
+      refreshToken,
     };
   }
 
-  /**
-   * Login user
-   */
-  async login(loginData: LoginData) {
-    // Find user with password field
+  async login(dto: ILoginDTO): Promise<IAuthResponse> {
+    // Find user by email
     const user = await this.userRepository.findOne({
-      where: { email: loginData.email },
-      select: ["id", "name", "email", "password", "role"],
+      where: { email: dto.email },
     });
 
     if (!user) {
-      throw new ApiError(httpStatus.UNAUTHORIZED, "Invalid email or password");
+      throw new ApiError("Invalid credentials", 401, [
+        "Email or password is incorrect",
+      ]);
     }
 
-    // Verify password
-    const isPasswordValid = await comparePassword(
-      loginData.password,
+    // Check if user is active
+    if (!user.isActive) {
+      throw new ApiError("Account deactivated", 403, [
+        "Your account has been deactivated",
+      ]);
+    }
+
+    // Compare password
+    const passwordMatch = await PasswordService.comparePassword(
+      dto.password,
       user.password
     );
-    if (!isPasswordValid) {
-      throw new ApiError(httpStatus.UNAUTHORIZED, "Invalid email or password");
+
+    if (!passwordMatch) {
+      throw new ApiError("Invalid credentials", 401, [
+        "Email or password is incorrect",
+      ]);
     }
 
     // Generate tokens
-    const tokens = generateTokens({
-      userId: user.id,
+    const tokenPayload: ITokenPayload = {
+      id: user.id,
       email: user.email,
       role: user.role,
-    });
+    };
 
-    // Save refresh token
-    user.refreshToken = tokens.refreshToken;
-    await this.userRepository.save(user);
+    const { accessToken, refreshToken } =
+      JwtService.generateTokenPair(tokenPayload);
 
     return {
       user: {
@@ -101,156 +136,147 @@ class AuthService {
         name: user.name,
         email: user.email,
         role: user.role,
+        phone: user.phone,
       },
-      tokens,
+      accessToken,
+      refreshToken,
     };
   }
 
-  /**
-   * Refresh access token
-   */
-  async refreshToken(refreshToken: string) {
+  async refreshAccessToken(
+    refreshToken: string
+  ): Promise<{ accessToken: string; refreshToken: string }> {
     try {
-      // Verify refresh token
-      const payload = verifyToken(refreshToken);
+      const decoded = JwtService.verifyToken(refreshToken);
 
-      // Find user and check if refresh token matches
+      // Find user to ensure they still exist and are active
       const user = await this.userRepository.findOne({
-        where: { id: payload.userId },
-        select: ["id", "email", "role", "refreshToken"],
+        where: { id: decoded.id },
       });
 
-      if (!user || user.refreshToken !== refreshToken) {
-        throw new ApiError(httpStatus.UNAUTHORIZED, "Invalid refresh token");
+      if (!user || !user.isActive) {
+        throw new ApiError("Unauthorized", 401, [
+          "User not found or account is inactive",
+        ]);
       }
 
       // Generate new tokens
-      const tokens = generateTokens({
-        userId: user.id,
+      const tokenPayload: ITokenPayload = {
+        id: user.id,
         email: user.email,
         role: user.role,
-      });
+      };
 
-      // Update refresh token
-      user.refreshToken = tokens.refreshToken;
-      await this.userRepository.save(user);
+      const newAccessToken = JwtService.generateAccessToken(tokenPayload);
+      const newRefreshToken = JwtService.generateRefreshToken(tokenPayload);
 
-      return tokens;
+      return {
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken,
+      };
     } catch (error) {
-      throw new ApiError(httpStatus.UNAUTHORIZED, "Invalid refresh token");
+      throw new ApiError("Unauthorized", 401, ["Invalid refresh token"]);
     }
   }
 
-  /**
-   * Logout user
-   */
-  async logout(userId: string) {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) {
-      throw new ApiError(httpStatus.NOT_FOUND, "User not found");
-    }
-
-    user.refreshToken = null;
-    await this.userRepository.save(user);
-
-    return { message: "Logged out successfully" };
-  }
-
-  /**
-   * Request password reset
-   */
-  async requestPasswordReset(email: string) {
-    const user = await this.userRepository.findOne({ where: { email } });
-    if (!user) {
-      // Don't reveal that user doesn't exist
-      return { message: "If the email exists, a reset link has been sent" };
-    }
-
-    // Generate reset token
-    const resetToken = crypto.randomBytes(32).toString("hex");
-    user.resetPasswordToken = crypto
-      .createHash("sha256")
-      .update(resetToken)
-      .digest("hex");
-    user.resetPasswordExpires = new Date(Date.now() + 3600000); // 1 hour
-    await this.userRepository.save(user);
-
-    // TODO: Send email with reset token
-    // await emailService.sendPasswordResetEmail(user.email, resetToken);
-
-    return {
-      message: "If the email exists, a reset link has been sent",
-      resetToken, // In production, only send via email
-    };
-  }
-
-  /**
-   * Reset password
-   */
-  async resetPassword(token: string, newPassword: string) {
-    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
-
-    const user = await this.userRepository.findOne({
-      where: {
-        resetPasswordToken: hashedToken,
-        resetPasswordExpires: MoreThan(new Date()),
-      },
-      select: ["id", "email", "resetPasswordToken", "resetPasswordExpires"],
-    });
-
-    if (!user) {
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        "Invalid or expired reset token"
-      );
-    }
-
-    // Update password
-    user.setPassword(newPassword);
-    user.resetPasswordToken = null;
-    user.resetPasswordExpires = null;
-    user.refreshToken = null; // Invalidate all sessions
-    await this.userRepository.save(user);
-
-    return { message: "Password reset successfully" };
-  }
-
-  /**
-   * Change password
-   */
   async changePassword(
     userId: string,
-    currentPassword: string,
+    oldPassword: string,
     newPassword: string
-  ) {
+  ): Promise<void> {
+    // Find user
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      select: ["id", "email", "password"],
     });
 
     if (!user) {
-      throw new ApiError(httpStatus.NOT_FOUND, "User not found");
+      throw new ApiError("User not found", 404);
     }
 
-    // Verify current password
-    const isPasswordValid = await comparePassword(
-      currentPassword,
+    // Compare old password
+    const passwordMatch = await PasswordService.comparePassword(
+      oldPassword,
       user.password
     );
-    if (!isPasswordValid) {
+
+    if (!passwordMatch) {
+      throw new ApiError("Invalid credentials", 401, [
+        "Current password is incorrect",
+      ]);
+    }
+
+    // Validate new password strength
+    const passwordValidation = PasswordService.validatePassword(newPassword);
+    if (!passwordValidation.isValid) {
       throw new ApiError(
-        httpStatus.UNAUTHORIZED,
-        "Current password is incorrect"
+        "Password does not meet requirements",
+        400,
+        passwordValidation.errors
       );
     }
 
-    // Update password
-    user.setPassword(newPassword);
-    user.refreshToken = null; // Invalidate all sessions
-    await this.userRepository.save(user);
+    // Hash and update password
+    user.password = await PasswordService.hashPassword(newPassword);
+    user.updatedAt = new Date();
 
-    return { message: "Password changed successfully" };
+    await this.userRepository.save(user);
+  }
+
+  async initiatePasswordReset(email: string): Promise<string> {
+    // Find user by email
+    const user = await this.userRepository.findOne({
+      where: { email },
+    });
+
+    if (!user) {
+      // Don't reveal if email exists for security reasons
+      return "If an account exists with this email, a reset link will be sent";
+    }
+
+    // Generate reset token (valid for 1 hour)
+    const resetToken = JwtService.generateAccessToken({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    });
+
+    // In production, store reset token hash in database with expiration
+    // For now, just return the token
+    return resetToken;
+  }
+
+  async resetPassword(resetToken: string, newPassword: string): Promise<void> {
+    try {
+      const decoded = JwtService.verifyToken(resetToken);
+
+      // Find user
+      const user = await this.userRepository.findOne({
+        where: { id: decoded.id },
+      });
+
+      if (!user) {
+        throw new ApiError("User not found", 404);
+      }
+
+      // Validate new password strength
+      const passwordValidation = PasswordService.validatePassword(newPassword);
+      if (!passwordValidation.isValid) {
+        throw new ApiError(
+          "Password does not meet requirements",
+          400,
+          passwordValidation.errors
+        );
+      }
+
+      // Hash and update password
+      user.password = await PasswordService.hashPassword(newPassword);
+      user.updatedAt = new Date();
+
+      await this.userRepository.save(user);
+    } catch (error) {
+      throw new ApiError("Invalid reset token", 401);
+    }
   }
 }
 
-export default new AuthService();
+export const authService = new AuthService();

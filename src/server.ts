@@ -11,7 +11,9 @@ const startServer = async () => {
 
     // Start server
     const server = app.listen(config.port, () => {
-      logger.info(`🚀 Server running on port ${config.port} in ${config.env} mode`);
+      logger.info(
+        `🚀 Server running on port ${config.port} in ${config.env} mode`
+      );
       console.log(`🚀 Server running on port ${config.port}`);
       console.log(`📝 API available at http://localhost:${config.port}/api`);
       console.log(`❤️  Health check at http://localhost:${config.port}/health`);

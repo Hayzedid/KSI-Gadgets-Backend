@@ -1,86 +1,66 @@
 import { Request, Response, NextFunction } from "express";
-import { verifyToken } from "../utils/jwt";
-import ApiError from "../utils/ApiError";
-import httpStatus from "../constants/httpStatus";
-import { AppDataSource } from "../config/database";
-import User from "../models/user.model";
+import { JwtService, IDecodedToken } from "../utils/jwt";
+import { ApiError } from "../utils/ApiError";
 
-// Extend Express Request type
-declare global {
-  namespace Express {
-    interface Request {
-      user?: {
-        userId: string;
-        email: string;
-        role: string;
-      };
-    }
-  }
+// Extend Express Request to include user information
+export interface IAuthRequest extends Request {
+  user?: IDecodedToken;
 }
 
 /**
- * Authenticate user using JWT token
+ * Authentication middleware - verifies JWT token
  */
-export const authenticate = async (
-  req: Request,
+export const authenticate = (
+  req: IAuthRequest,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    // Get token from header
     const authHeader = req.headers.authorization;
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      throw new ApiError(httpStatus.UNAUTHORIZED, "No token provided");
+    if (!authHeader) {
+      throw new ApiError("No authorization token provided", 401, [
+        "Missing authorization header",
+      ]);
     }
 
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-
-    try {
-      // Verify token
-      const decoded = verifyToken(token);
-
-      // Check if user still exists
-      const userRepository = AppDataSource.getRepository(User);
-      const user = await userRepository.findOne({
-        where: { id: decoded.userId },
-      });
-      if (!user) {
-        throw new ApiError(httpStatus.UNAUTHORIZED, "User no longer exists");
-      }
-
-      // Attach user to request
-      req.user = {
-        userId: decoded.userId,
-        email: decoded.email,
-        role: decoded.role,
-      };
-
-      next();
-    } catch (error) {
-      throw new ApiError(httpStatus.UNAUTHORIZED, "Invalid or expired token");
+    // Extract token from Bearer scheme
+    const parts = authHeader.split(" ");
+    if (parts.length !== 2 || parts[0] !== "Bearer") {
+      throw new ApiError("Invalid authorization header format", 401, [
+        "Expected Bearer token",
+      ]);
     }
-  } catch (error) {
-    next(error);
+
+    const token = parts[1];
+
+    // Verify token
+    const decoded = JwtService.verifyToken(token);
+    req.user = decoded;
+
+    next();
+  } catch (error: any) {
+    next(
+      new ApiError("Unauthorized", 401, [
+        error.message || "Invalid or expired token",
+      ])
+    );
   }
 };
 
 /**
- * Authorize user based on roles
+ * Authorization middleware - checks user role
  */
-export const authorize = (...roles: string[]) => {
-  return (req: Request, res: Response, next: NextFunction) => {
+export const authorize = (...allowedRoles: string[]) => {
+  return (req: IAuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
-      return next(new ApiError(httpStatus.UNAUTHORIZED, "Not authenticated"));
+      return next(
+        new ApiError("Unauthorized", 401, ["User not authenticated"])
+      );
     }
 
-    if (!roles.includes(req.user.role)) {
-      return next(
-        new ApiError(
-          httpStatus.FORBIDDEN,
-          "You do not have permission to perform this action"
-        )
-      );
+    if (!allowedRoles.includes(req.user.role)) {
+      return next(new ApiError("Forbidden", 403, ["Insufficient permissions"]));
     }
 
     next();
@@ -88,42 +68,29 @@ export const authorize = (...roles: string[]) => {
 };
 
 /**
- * Optional authentication - does not throw error if no token
+ * Optional authentication middleware - doesn't fail if no token
  */
-export const optionalAuth = async (
-  req: Request,
+export const optionalAuth = (
+  req: IAuthRequest,
   res: Response,
   next: NextFunction
 ) => {
   try {
     const authHeader = req.headers.authorization;
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return next();
-    }
-
-    const token = authHeader.substring(7);
-
-    try {
-      const decoded = verifyToken(token);
-      const userRepository = AppDataSource.getRepository(User);
-      const user = await userRepository.findOne({
-        where: { id: decoded.userId },
-      });
-
-      if (user) {
-        req.user = {
-          userId: decoded.userId,
-          email: decoded.email,
-          role: decoded.role,
-        };
+    if (authHeader) {
+      const parts = authHeader.split(" ");
+      if (parts.length === 2 && parts[0] === "Bearer") {
+        const token = parts[1];
+        const decoded = JwtService.verifyToken(token);
+        req.user = decoded;
       }
-    } catch (error) {
-      // Silently fail for optional auth
     }
-
-    next();
   } catch (error) {
-    next(error);
+    // Silent fail - optional authentication
   }
+
+  next();
 };
+
+export default authenticate;
