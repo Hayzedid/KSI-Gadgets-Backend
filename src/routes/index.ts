@@ -4,6 +4,8 @@ import userRoutes from "./user.routes";
 import productRoutes from "./product.routes";
 import cartRoutes from "./cart.routes";
 import orderRoutes from "./order.routes";
+import paymentRoutes from "./payment.routes";
+import cryptoPaymentRoutes from "./crypto-payment.routes";
 
 const router = Router();
 
@@ -13,5 +15,7 @@ router.use("/users", userRoutes);
 router.use("/products", productRoutes);
 router.use("/cart", cartRoutes);
 router.use("/orders", orderRoutes);
+router.use("/payments", paymentRoutes);
+router.use("/crypto-payments", cryptoPaymentRoutes);
 
 export default router;

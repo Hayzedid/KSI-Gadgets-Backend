@@ -7,6 +7,9 @@ import cookieParser from "cookie-parser";
 import routes from "./routes";
 import { errorHandler } from "./middlewares/error.middleware";
 import { rateLimiter } from "./middlewares/rateLimit.middleware";
+import { requestLogger } from "./middlewares/requestLogger.middleware";
+import sanitizeRequest from "./middlewares/sanitize.middleware";
+import setupSwagger from "./docs/swagger";
 
 const app: Application = express();
 
@@ -25,8 +28,17 @@ app.use(cookieParser());
 // Compression middleware
 app.use(compression());
 
+// Request logging
+app.use(requestLogger);
+
+// Basic input sanitization
+app.use(sanitizeRequest);
+
 // API routes
 app.use("/api", routes);
+
+// Swagger docs
+setupSwagger(app);
 
 // Health check
 app.get("/health", (req, res) => {

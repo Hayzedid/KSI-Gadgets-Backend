@@ -7,7 +7,9 @@ import {
 } from "../models/order.model";
 import { Cart } from "../models/cart.model";
 import { Product } from "../models/product.model";
+import { User } from "../models/user.model";
 import { ApiError } from "../utils/ApiError";
+import emailService from "./email.service";
 
 interface CreateOrderInput {
   shippingAddress: string;
@@ -23,6 +25,7 @@ export class OrderService {
   private orderRepository = AppDataSource.getRepository(Order);
   private cartRepository = AppDataSource.getRepository(Cart);
   private productRepository = AppDataSource.getRepository(Product);
+  private userRepository = AppDataSource.getRepository(User);
 
   private generateOrderNumber(): string {
     const timestamp = Date.now();
@@ -100,7 +103,34 @@ export class OrderService {
 
     // Clear cart
     await this.cartRepository.update({ userId }, { items: [], totalAmount: 0 });
+// Send order confirmation email (fire-and-forget)
+    try {
+      const user = await this.userRepository.findOne({ where: { id: userId } });
+      if (user) {
+        const orderEmailData = {
+          orderId: savedOrder.orderNumber,
+          customerName: user.name,
+          orderDate: savedOrder.createdAt.toLocaleDateString(),
+          items: orderItems.map((item) => ({
+            name: item.productName,
+            quantity: item.quantity,
+            price: item.price,
+            subtotal: item.subtotal,
+          })),
+          totalAmount: savedOrder.totalAmount,
+          shippingAddress: `${orderData.shippingAddress}\n${orderData.shippingCity}, ${orderData.shippingState} ${orderData.shippingZipCode}\n${orderData.shippingCountry}`,
+          paymentMethod: savedOrder.paymentMethod || "Pending",
+        };
 
+        await emailService
+          .sendOrderConfirmationEmail(user.email, orderEmailData)
+          .catch(() => {});
+      }
+    } catch (e) {
+      // swallow email errors
+    }
+
+    
     return savedOrder;
   }
 
@@ -205,7 +235,28 @@ export class OrderService {
       order.trackingNumber = trackingNumber;
     }
 
-    return await this.orderRepository.save(order);
+    const updatedOrder = await this.orderRepository.save(order);
+
+    // Send order status update email (fire-and-forget)
+    try {
+      const user = await this.userRepository.findOne({
+        where: { id: order.userId },
+      });
+      if (user) {
+        await emailService
+          .sendOrderStatusUpdateEmail(
+            user.email,
+            user.name,
+            order.orderNumber,
+            status
+          )
+          .catch(() => {});
+      }
+    } catch (e) {
+      // swallow email errors
+    }
+
+    return updatedOrder;
   }
 
   async cancelOrder(
@@ -242,7 +293,23 @@ export class OrderService {
     order.cancelledAt = new Date();
     order.cancellationReason = reason;
 
-    return await this.orderRepository.save(order);
+    const cancelledOrder = await this.orderRepository.save(order);
+
+    // Send order cancellation email (fire-and-forget)
+    try {
+      const user = await this.userRepository.findOne({
+        where: { id: order.userId },
+      });
+      if (user) {
+        await emailService
+          .sendOrderCancellationEmail(user.email, user.name, order.orderNumber)
+          .catch(() => {});
+      }
+    } catch (e) {
+      // swallow email errors
+    }
+
+    return cancelledOrder;
   }
 
   async updatePaymentStatus(

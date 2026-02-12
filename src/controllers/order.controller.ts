@@ -4,6 +4,7 @@ import { OrderService } from "../services/order.service";
 import { asyncHandler } from "../utils/asyncHandler";
 import { ApiResponse } from "../utils/ApiResponse";
 import { OrderStatus, PaymentStatus } from "../models/order.model";
+import emailService from "../utils/email.service";
 
 const orderService = new OrderService();
 
@@ -17,6 +18,15 @@ export const createOrder = asyncHandler(
     const orderData = req.body;
 
     const order = await orderService.createOrder(userId, orderData);
+
+    // Send order confirmation email if email available
+    try {
+      const userEmail = req.user?.email;
+      if (userEmail) {
+        const detailsHtml = `<p>Items: ${JSON.stringify(order.items || [])}</p><p>Total: ${order.totalAmount}</p>`;
+        emailService.sendOrderConfirmation(userEmail, order.id, detailsHtml).catch(() => {});
+      }
+    } catch (e) {}
 
     res
       .status(201)

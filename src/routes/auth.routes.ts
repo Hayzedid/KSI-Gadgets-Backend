@@ -6,6 +6,9 @@ import {
   loginValidator,
   refreshTokenValidator,
   changePasswordValidator,
+  requestPasswordResetValidator,
+  resetPasswordValidator,
+  verifyResetTokenValidator,
 } from "../validators/auth.validator";
 import { validate } from "../middlewares/validation.middleware";
 
@@ -19,6 +22,24 @@ router.post(
   refreshTokenValidator,
   validate,
   AuthController.refreshToken
+);
+router.post(
+  "/request-password-reset",
+  requestPasswordResetValidator,
+  validate,
+  AuthController.requestPasswordReset
+);
+router.post(
+  "/reset-password",
+  resetPasswordValidator,
+  validate,
+  AuthController.resetPassword
+);
+router.post(
+  "/verify-reset-token",
+  verifyResetTokenValidator,
+  validate,
+  AuthController.verifyResetToken
 );
 
 // Protected routes

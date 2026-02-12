@@ -20,6 +20,11 @@ interface Config {
   emailPassword: string;
   emailFrom: string;
   clientUrl: string;
+  stripeSecretKey: string;
+  stripePublishableKey: string;
+  stripeWebhookSecret: string;
+  coinbaseApiKey: string;
+  coinbaseWebhookSecret: string;
 }
 
 const config: Config = {
@@ -39,6 +44,11 @@ const config: Config = {
   emailPassword: process.env.EMAIL_PASSWORD || "",
   emailFrom: process.env.EMAIL_FROM || "noreply@ksi-gadgets.com",
   clientUrl: process.env.CLIENT_URL || "http://localhost:3000",
+  stripeSecretKey: process.env.STRIPE_SECRET_KEY || "",
+  stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || "",
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
+  coinbaseApiKey: process.env.COINBASE_API_KEY || "",
+  coinbaseWebhookSecret: process.env.COINBASE_WEBHOOK_SECRET || "",
 };
 
 export default config;

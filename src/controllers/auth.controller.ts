@@ -98,6 +98,50 @@ export class AuthController {
       .status(200)
       .json(new ApiResponse(200, null, "Logout successful"));
   });
+
+  static requestPasswordReset = asyncHandler(
+    async (req: IAuthRequest, res: Response) => {
+      const { email } = req.body;
+
+      await authService.initiatePasswordReset(email);
+
+      return res.status(200).json(
+        new ApiResponse(
+          200,
+          null,
+          "If an account exists with this email, a password reset link will be sent"
+        )
+      );
+    }
+  );
+
+  static resetPassword = asyncHandler(
+    async (req: IAuthRequest, res: Response) => {
+      const { token, newPassword } = req.body;
+
+      await authService.resetPassword(token, newPassword);
+
+      return res
+        .status(200)
+        .json(new ApiResponse(200, null, "Password reset successfully"));
+    }
+  );
+
+  static verifyResetToken = asyncHandler(
+    async (req: IAuthRequest, res: Response) => {
+      const { token } = req.body;
+
+      const isValid = await authService.verifyResetToken(token);
+
+      return res.status(200).json(
+        new ApiResponse(
+          200,
+          { valid: isValid },
+          isValid ? "Token is valid" : "Token is invalid or expired"
+        )
+      );
+    }
+  );
 }
 
 export default AuthController;

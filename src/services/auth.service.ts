@@ -1,6 +1,11 @@
 import { AppDataSource } from "../config/database";
 import { User, UserRole } from "../models/user.model";
 import { PasswordService } from "../utils/password";
+import { JwtService, ITokenPayload } from "../utils/jwt";
+import ApiError from "../utils/ApiError";
+import config from "../config/env";
+import emailService from "../services/email.service";
+import crypto from "crypto";
 
 export interface IRegisterDTO {
   name: string;
@@ -66,6 +71,14 @@ export class AuthService {
 
     const savedUser = await this.userRepository.save(user);
 
+    // Send welcome email (fire-and-forget)
+    try {
+      await emailService
+        .sendWelcomeEmail(savedUser.email, savedUser.name)
+        .catch(() => {});
+    } catch (e) {
+      // swallow email errors to avoid failing registration
+    }
     // Generate tokens
     const tokenPayload: ITokenPayload = {
       id: savedUser.id,
@@ -220,9 +233,18 @@ export class AuthService {
     user.updatedAt = new Date();
 
     await this.userRepository.save(user);
+
+    // Send password changed confirmation email (fire-and-forget)
+    try {
+      await emailService
+        .sendPasswordChangedEmail(user.email, user.name)
+        .catch(() => {});
+    } catch (e) {
+      // swallow email errors
+    }
   }
 
-  async initiatePasswordReset(email: string): Promise<string> {
+  async initiatePasswordReset(email: string): Promise<void> {
     // Find user by email
     const user = await this.userRepository.findOne({
       where: { email },
@@ -230,52 +252,110 @@ export class AuthService {
 
     if (!user) {
       // Don't reveal if email exists for security reasons
-      return "If an account exists with this email, a reset link will be sent";
+      // Return success anyway to prevent email enumeration
+      return;
     }
 
-    // Generate reset token (valid for 1 hour)
-    const resetToken = JwtService.generateAccessToken({
-      id: user.id,
-      email: user.email,
-      role: user.role,
-    });
+    // Generate secure random token
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto.createHash("sha256").update(resetToken).digest("hex");
 
-    // In production, store reset token hash in database with expiration
-    // For now, just return the token
-    return resetToken;
+    // Set token and expiration (1 hour from now)
+    user.passwordResetToken = tokenHash;
+    user.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await this.userRepository.save(user);
+
+    // Send password reset email
+    try {
+      await emailService.sendPasswordResetEmail(
+        user.email,
+        user.name,
+        resetToken
+      );
+    } catch (error) {
+      // Log error but don't fail the request
+      throw new ApiError("Failed to send reset email", 500, [
+        "Please try again later",
+      ]);
+    }
   }
 
   async resetPassword(resetToken: string, newPassword: string): Promise<void> {
-    try {
-      const decoded = JwtService.verifyToken(resetToken);
+    // Hash the token to compare with database
+    const tokenHash = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
 
-      // Find user
-      const user = await this.userRepository.findOne({
-        where: { id: decoded.id },
-      });
+    // Find user with matching token and unexpired token
+    const user = await this.userRepository.findOne({
+      where: {
+        passwordResetToken: tokenHash,
+      },
+    });
 
-      if (!user) {
-        throw new ApiError("User not found", 404);
-      }
-
-      // Validate new password strength
-      const passwordValidation = PasswordService.validatePassword(newPassword);
-      if (!passwordValidation.isValid) {
-        throw new ApiError(
-          "Password does not meet requirements",
-          400,
-          passwordValidation.errors
-        );
-      }
-
-      // Hash and update password
-      user.password = await PasswordService.hashPassword(newPassword);
-      user.updatedAt = new Date();
-
-      await this.userRepository.save(user);
-    } catch (error) {
-      throw new ApiError("Invalid reset token", 401);
+    if (!user) {
+      throw new ApiError("Invalid or expired reset token", 400, [
+        "Please request a new password reset link",
+      ]);
     }
+
+    // Check if token is expired
+    if (!user.passwordResetExpires || user.passwordResetExpires < new Date()) {
+      throw new ApiError("Reset token has expired", 400, [
+        "Please request a new password reset link",
+      ]);
+    }
+
+    // Validate new password strength
+    const passwordValidation = PasswordService.validatePassword(newPassword);
+    if (!passwordValidation.isValid) {
+      throw new ApiError(
+        "Password does not meet requirements",
+        400,
+        passwordValidation.errors
+      );
+    }
+
+    // Hash and update password
+    user.password = await PasswordService.hashPassword(newPassword);
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    user.updatedAt = new Date();
+
+    await this.userRepository.save(user);
+
+    // Send confirmation email (fire-and-forget)
+    try {
+      await emailService
+        .sendPasswordChangedEmail(user.email, user.name)
+        .catch(() => {});
+    } catch (e) {
+      // swallow email errors
+    }
+  }
+
+  async verifyResetToken(resetToken: string): Promise<boolean> {
+    // Hash the token to compare with database
+    const tokenHash = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
+
+    // Find user with matching token and unexpired token
+    const user = await this.userRepository.findOne({
+      where: {
+        passwordResetToken: tokenHash,
+      },
+    });
+
+    if (!user || !user.passwordResetExpires) {
+      return false;
+    }
+
+    // Check if token is expired
+    return user.passwordResetExpires > new Date();
   }
 }
 
