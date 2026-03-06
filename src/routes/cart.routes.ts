@@ -34,10 +34,76 @@ const productIdParamValidator = [
   param("productId").isUUID().withMessage("Invalid product ID"),
 ];
 
+/**
+ * @swagger
+ * /api/cart:
+ *   get:
+ *     summary: Get user cart
+ *     tags: [Cart]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User cart
+ */
 router.get("/", cartController.getCart);
 
+/**
+ * @swagger
+ * /api/cart/items:
+ *   post:
+ *     summary: Add item to cart
+ *     tags: [Cart]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - productId
+ *             properties:
+ *               productId:
+ *                 type: string
+ *               quantity:
+ *                 type: integer
+ *     responses:
+ *       200:
+ *         description: Item added to cart
+ */
 router.post("/items", addToCartValidator, validate, cartController.addToCart);
 
+/**
+ * @swagger
+ * /api/cart/items/{productId}:
+ *   put:
+ *     summary: Update cart item quantity
+ *     tags: [Cart]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: productId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - quantity
+ *             properties:
+ *               quantity:
+ *                 type: integer
+ *     responses:
+ *       200:
+ *         description: Cart item updated
+ */
 router.put(
   "/items/:productId",
   updateCartItemValidator,
@@ -45,6 +111,24 @@ router.put(
   cartController.updateCartItem
 );
 
+/**
+ * @swagger
+ * /api/cart/items/{productId}:
+ *   delete:
+ *     summary: Remove item from cart
+ *     tags: [Cart]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: productId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Item removed
+ */
 router.delete(
   "/items/:productId",
   productIdParamValidator,
@@ -52,6 +136,18 @@ router.delete(
   cartController.removeFromCart
 );
 
+/**
+ * @swagger
+ * /api/cart:
+ *   delete:
+ *     summary: Clear cart
+ *     tags: [Cart]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Cart cleared
+ */
 router.delete("/", cartController.clearCart);
 
 export default router;

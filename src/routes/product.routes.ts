@@ -7,7 +7,33 @@ import { UserRole } from "../models/user.model";
 
 const router = Router();
 
-// Public routes
+/**
+ * @swagger
+ * /api/products:
+ *   get:
+ *     summary: Get all products
+ *     tags: [Products]
+ *     parameters:
+ *       - in: query
+ *         name: category
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: List of products
+ */
 router.get(
   "/",
   productValidator.getProductsQueryValidator,
@@ -15,6 +41,24 @@ router.get(
   productController.getAllProducts
 );
 
+/**
+ * @swagger
+ * /api/products/{id}:
+ *   get:
+ *     summary: Get product by ID
+ *     tags: [Products]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Product details
+ *       404:
+ *         description: Product not found
+ */
 router.get(
   "/:id",
   productValidator.productIdValidator,
@@ -22,6 +66,22 @@ router.get(
   productController.getProductById
 );
 
+/**
+ * @swagger
+ * /api/products/{id}/reviews:
+ *   get:
+ *     summary: Get product reviews
+ *     tags: [Products]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: List of reviews
+ */
 router.get(
   "/:id/reviews",
   productValidator.productIdValidator,
@@ -29,7 +89,35 @@ router.get(
   productController.getProductReviews
 );
 
-// Protected routes (require authentication)
+/**
+ * @swagger
+ * /api/products/{id}/reviews:
+ *   post:
+ *     summary: Add product review
+ *     tags: [Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               rating:
+ *                 type: integer
+ *               comment:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Review added
+ */
 router.post(
   "/:id/reviews",
   authenticate,
@@ -38,6 +126,35 @@ router.post(
   productController.addProductReview
 );
 
+/**
+ * @swagger
+ * /api/products/reviews/{reviewId}:
+ *   put:
+ *     summary: Update product review
+ *     tags: [Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: reviewId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               rating:
+ *                 type: integer
+ *               comment:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Review updated
+ */
 router.put(
   "/reviews/:reviewId",
   authenticate,
@@ -46,6 +163,24 @@ router.put(
   productController.updateProductReview
 );
 
+/**
+ * @swagger
+ * /api/products/reviews/{reviewId}:
+ *   delete:
+ *     summary: Delete product review
+ *     tags: [Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: reviewId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Review deleted
+ */
 router.delete(
   "/reviews/:reviewId",
   authenticate,
@@ -54,7 +189,41 @@ router.delete(
   productController.deleteProductReview
 );
 
-// Admin routes (require authentication and admin role)
+/**
+ * @swagger
+ * /api/products:
+ *   post:
+ *     summary: Create product (Admin only)
+ *     tags: [Products]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *               - price
+ *               - category
+ *             properties:
+ *               name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               price:
+ *                 type: number
+ *               category:
+ *                 type: string
+ *               stock:
+ *                 type: integer
+ *               imageUrl:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Product created
+ */
 router.post(
   "/",
   authenticate,
@@ -64,6 +233,39 @@ router.post(
   productController.createProduct
 );
 
+/**
+ * @swagger
+ * /api/products/{id}:
+ *   put:
+ *     summary: Update product (Admin only)
+ *     tags: [Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               price:
+ *                 type: number
+ *               stock:
+ *                 type: integer
+ *     responses:
+ *       200:
+ *         description: Product updated
+ */
 router.put(
   "/:id",
   authenticate,
@@ -73,6 +275,24 @@ router.put(
   productController.updateProduct
 );
 
+/**
+ * @swagger
+ * /api/products/{id}:
+ *   delete:
+ *     summary: Delete product (Admin only)
+ *     tags: [Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Product deleted
+ */
 router.delete(
   "/:id",
   authenticate,
