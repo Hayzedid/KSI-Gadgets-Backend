@@ -19,6 +19,9 @@ export const AppDataSource = new DataSource({
   entities: [User, Product, Review, Cart, CartItem, Order],
   migrations: ["src/migrations/**/*.ts"],
   subscribers: [],
+  ssl: {
+    rejectUnauthorized: false, // Required for Neon database
+  },
 });
 
 export const connectDatabase = async (): Promise<void> => {

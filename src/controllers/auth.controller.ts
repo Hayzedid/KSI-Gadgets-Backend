@@ -2,7 +2,7 @@ import { Response } from "express";
 import { IAuthRequest } from "../middlewares/auth.middleware";
 import { authService } from "../services/auth.service";
 import { ApiResponse } from "../utils/ApiResponse";
-import { asyncHandler } from "../utils/asyncHandler";
+import { asyncHandler } from "../utils/asyncHandler" ;
 
 export class AuthController {
   static register = asyncHandler(async (req: IAuthRequest, res: Response) => {

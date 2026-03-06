@@ -1,10 +1,12 @@
+// @ts-ignore - No types available for coinbase-commerce-node
 import { Client, resources, Webhook } from "coinbase-commerce-node";
 import config from "../config/env";
 import { AppDataSource } from "../config/database";
-import { Order, PaymentStatus } from "../models/order.model";
+import { Order, PaymentStatus, PaymentMethod } from "../models/order.model";
 import { ApiError } from "../utils/ApiError";
 import logger from "../config/logger";
 
+// Trigger restart for type declaration update
 const { Charge } = resources;
 
 interface CreateCryptoChargeData {
@@ -65,15 +67,16 @@ class CryptoPaymentService {
       if (order.paymentTransactionId?.startsWith("coinbase_")) {
         const existingChargeId = order.paymentTransactionId.replace(
           "coinbase_",
-          ""
+          "",
         );
         try {
           const existingCharge = await Charge.retrieve(existingChargeId);
-          
+
           // Return existing charge if still valid
           if (
             existingCharge.timeline?.some(
-              (event: any) => event.status === "PENDING" || event.status === "NEW"
+              (event: any) =>
+                event.status === "PENDING" || event.status === "NEW",
             )
           ) {
             return {
@@ -113,7 +116,7 @@ class CryptoPaymentService {
 
       // Store charge ID with prefix to distinguish from Stripe
       order.paymentTransactionId = `coinbase_${charge.id}`;
-      order.paymentMethod = "cryptocurrency";
+      order.paymentMethod = PaymentMethod.CRYPTOCURRENCY;
       await this.orderRepository.save(order);
 
       logger.info("Crypto charge created", {
@@ -133,7 +136,7 @@ class CryptoPaymentService {
       if (error instanceof ApiError) throw error;
       throw new ApiError(
         500,
-        error.message || "Failed to create crypto charge"
+        error.message || "Failed to create crypto charge",
       );
     }
   }
@@ -190,14 +193,14 @@ class CryptoPaymentService {
    */
   async handleWebhook(
     rawBody: string,
-    signature: string
+    signature: string,
   ): Promise<{ received: boolean }> {
     try {
       // Verify webhook signature
       const event = Webhook.verifyEventBody(
         rawBody,
         signature,
-        config.coinbaseWebhookSecret
+        config.coinbaseWebhookSecret,
       );
 
       logger.info("Coinbase webhook received", { type: event.type });
@@ -282,7 +285,7 @@ class CryptoPaymentService {
 
     if (order && order.paymentStatus !== PaymentStatus.COMPLETED) {
       order.paymentStatus = PaymentStatus.COMPLETED;
-      order.paymentMethod = "cryptocurrency";
+      order.paymentMethod = PaymentMethod.CRYPTOCURRENCY;
       await this.orderRepository.save(order);
 
       logger.info("Charge confirmed webhook processed", {

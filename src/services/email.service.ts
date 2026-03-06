@@ -28,6 +28,13 @@ class EmailService {
   private transporter: nodemailer.Transporter;
 
   constructor() {
+    // Skip email configuration if credentials are not provided
+    if (!config.emailUser || !config.emailPassword) {
+      logger.warn("Email credentials not configured - emails will be logged only");
+      this.transporter = null as any;
+      return;
+    }
+
     // Create transporter with email configuration
     this.transporter = nodemailer.createTransport({
       host: config.emailHost,
@@ -44,6 +51,9 @@ class EmailService {
   }
 
   private async verifyConnection(): Promise<void> {
+    if (!this.transporter) {
+      return;
+    }
     try {
       await this.transporter.verify();
       logger.info("Email service is ready to send emails");
@@ -56,6 +66,16 @@ class EmailService {
    * Send email with provided options
    */
   async sendMail(options: EmailOptions): Promise<void> {
+    // If transporter is not configured, just log the email
+    if (!this.transporter) {
+      logger.info("[DEV MODE] Email would be sent", { 
+        to: options.to, 
+        subject: options.subject,
+        preview: options.text?.substring(0, 100) || options.html.substring(0, 100)
+      });
+      return;
+    }
+
     const mailOptions = {
       from: `KSI Gadgets <${config.emailFrom}>`,
       to: options.to,

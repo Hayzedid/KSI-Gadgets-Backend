@@ -2,12 +2,11 @@ import swaggerJsdoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
 import { Express } from "express";
 import config from "../config/env";
-
 const options = {
   definition: {
     openapi: "3.0.0",
     info: {
-      title: "KSI Gadgets E-Commerce API",
+      title: "KSI Gadgets E-Commercew API",
       version: "1.0.0",
       description: "Complete e-commerce backend with user management, authentication, products, cart, and orders",
       contact: {

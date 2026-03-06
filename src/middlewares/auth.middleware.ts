@@ -13,13 +13,13 @@ export interface IAuthRequest extends Request {
 export const authenticate = (
   req: IAuthRequest,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const authHeader = req.headers.authorization;
 
     if (!authHeader) {
-      throw new ApiError("No authorization token provided", 401, [
+      throw new ApiError(401, "No authorization token provided", [
         "Missing authorization header",
       ]);
     }
@@ -27,7 +27,7 @@ export const authenticate = (
     // Extract token from Bearer scheme
     const parts = authHeader.split(" ");
     if (parts.length !== 2 || parts[0] !== "Bearer") {
-      throw new ApiError("Invalid authorization header format", 401, [
+      throw new ApiError(401, "Invalid authorization header format", [
         "Expected Bearer token",
       ]);
     }
@@ -41,9 +41,9 @@ export const authenticate = (
     next();
   } catch (error: any) {
     next(
-      new ApiError("Unauthorized", 401, [
+      new ApiError(401, "Unauthorized", [
         error.message || "Invalid or expired token",
-      ])
+      ]),
     );
   }
 };
@@ -55,12 +55,12 @@ export const authorize = (...allowedRoles: string[]) => {
   return (req: IAuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
       return next(
-        new ApiError("Unauthorized", 401, ["User not authenticated"])
+        new ApiError(401, "Unauthorized", ["User not authenticated"]),
       );
     }
 
     if (!allowedRoles.includes(req.user.role)) {
-      return next(new ApiError("Forbidden", 403, ["Insufficient permissions"]));
+      return next(new ApiError(403, "Forbidden", ["Insufficient permissions"]));
     }
 
     next();
@@ -73,7 +73,7 @@ export const authorize = (...allowedRoles: string[]) => {
 export const optionalAuth = (
   req: IAuthRequest,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const authHeader = req.headers.authorization;

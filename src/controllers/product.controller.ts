@@ -3,13 +3,14 @@ import { IAuthRequest } from "../middlewares/auth.middleware";
 import { ProductService } from "../services/product.service";
 import { asyncHandler } from "../utils/asyncHandler";
 import { ApiResponse } from "../utils/ApiResponse";
+import { ProductCategory } from "../models/product.model";
 
 const productService = new ProductService();
 
 export const getAllProducts = asyncHandler(
   async (req: IAuthRequest, res: Response) => {
     const filters = {
-      category: req.query.category as string,
+      category: req.query.category as ProductCategory | undefined,
       minPrice: req.query.minPrice
         ? parseFloat(req.query.minPrice as string)
         : undefined,
@@ -24,7 +25,9 @@ export const getAllProducts = asyncHandler(
       page: req.query.page ? parseInt(req.query.page as string) : 1,
       limit: req.query.limit ? parseInt(req.query.limit as string) : 10,
       sortBy: (req.query.sortBy as string) || "createdAt",
-      sortOrder: (req.query.sortOrder as "asc" | "desc") || "desc",
+      sortOrder:
+        ((req.query.sortOrder as string)?.toUpperCase() as "ASC" | "DESC") ||
+        "DESC",
     };
 
     const result = await productService.getAllProducts(filters, pagination);
@@ -32,7 +35,7 @@ export const getAllProducts = asyncHandler(
     res
       .status(200)
       .json(new ApiResponse(200, result, "Products retrieved successfully"));
-  }
+  },
 );
 
 export const getProductById = asyncHandler(
@@ -42,7 +45,7 @@ export const getProductById = asyncHandler(
     res
       .status(200)
       .json(new ApiResponse(200, product, "Product retrieved successfully"));
-  }
+  },
 );
 
 export const createProduct = asyncHandler(
@@ -52,7 +55,7 @@ export const createProduct = asyncHandler(
     res
       .status(201)
       .json(new ApiResponse(201, product, "Product created successfully"));
-  }
+  },
 );
 
 export const updateProduct = asyncHandler(
@@ -62,7 +65,7 @@ export const updateProduct = asyncHandler(
     res
       .status(200)
       .json(new ApiResponse(200, product, "Product updated successfully"));
-  }
+  },
 );
 
 export const deleteProduct = asyncHandler(
@@ -72,7 +75,7 @@ export const deleteProduct = asyncHandler(
     res
       .status(200)
       .json(new ApiResponse(200, null, "Product deleted successfully"));
-  }
+  },
 );
 
 export const getProductReviews = asyncHandler(
@@ -82,7 +85,7 @@ export const getProductReviews = asyncHandler(
     res
       .status(200)
       .json(new ApiResponse(200, reviews, "Reviews retrieved successfully"));
-  }
+  },
 );
 
 export const addProductReview = asyncHandler(
@@ -97,13 +100,13 @@ export const addProductReview = asyncHandler(
       req.params.id,
       userId,
       rating,
-      comment
+      comment,
     );
 
     res
       .status(201)
       .json(new ApiResponse(201, review, "Review added successfully"));
-  }
+  },
 );
 
 export const updateProductReview = asyncHandler(
@@ -118,13 +121,13 @@ export const updateProductReview = asyncHandler(
       req.params.reviewId,
       userId,
       rating,
-      comment
+      comment,
     );
 
     res
       .status(200)
       .json(new ApiResponse(200, review, "Review updated successfully"));
-  }
+  },
 );
 
 export const deleteProductReview = asyncHandler(
@@ -139,5 +142,5 @@ export const deleteProductReview = asyncHandler(
     res
       .status(200)
       .json(new ApiResponse(200, null, "Review deleted successfully"));
-  }
+  },
 );

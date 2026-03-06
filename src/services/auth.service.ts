@@ -2,7 +2,7 @@ import { AppDataSource } from "../config/database";
 import { User, UserRole } from "../models/user.model";
 import { PasswordService } from "../utils/password";
 import { JwtService, ITokenPayload } from "../utils/jwt";
-import ApiError from "../utils/ApiError";
+import { ApiError } from "../utils/ApiError";
 import config from "../config/env";
 import emailService from "../services/email.service";
 import crypto from "crypto";
@@ -41,7 +41,7 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new ApiError("Email already registered", 400, [
+      throw new ApiError(400, "Email already registered", [
         "This email is already in use",
       ]);
     }
@@ -50,9 +50,9 @@ export class AuthService {
     const passwordValidation = PasswordService.validatePassword(dto.password);
     if (!passwordValidation.isValid) {
       throw new ApiError(
-        "Password does not meet requirements",
         400,
-        passwordValidation.errors
+        "Password does not meet requirements",
+        passwordValidation.errors,
       );
     }
 
@@ -109,14 +109,14 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new ApiError("Invalid credentials", 401, [
+      throw new ApiError(401, "Invalid credentials", [
         "Email or password is incorrect",
       ]);
     }
 
     // Check if user is active
     if (!user.isActive) {
-      throw new ApiError("Account deactivated", 403, [
+      throw new ApiError(403, "Account deactivated", [
         "Your account has been deactivated",
       ]);
     }
@@ -124,11 +124,11 @@ export class AuthService {
     // Compare password
     const passwordMatch = await PasswordService.comparePassword(
       dto.password,
-      user.password
+      user.password,
     );
 
     if (!passwordMatch) {
-      throw new ApiError("Invalid credentials", 401, [
+      throw new ApiError(401, "Invalid credentials", [
         "Email or password is incorrect",
       ]);
     }
@@ -157,7 +157,7 @@ export class AuthService {
   }
 
   async refreshAccessToken(
-    refreshToken: string
+    refreshToken: string,
   ): Promise<{ accessToken: string; refreshToken: string }> {
     try {
       const decoded = JwtService.verifyToken(refreshToken);
@@ -168,7 +168,7 @@ export class AuthService {
       });
 
       if (!user || !user.isActive) {
-        throw new ApiError("Unauthorized", 401, [
+        throw new ApiError(401, "Unauthorized", [
           "User not found or account is inactive",
         ]);
       }
@@ -188,14 +188,14 @@ export class AuthService {
         refreshToken: newRefreshToken,
       };
     } catch (error) {
-      throw new ApiError("Unauthorized", 401, ["Invalid refresh token"]);
+      throw new ApiError(401, "Unauthorized", ["Invalid refresh token"]);
     }
   }
 
   async changePassword(
     userId: string,
     oldPassword: string,
-    newPassword: string
+    newPassword: string,
   ): Promise<void> {
     // Find user
     const user = await this.userRepository.findOne({
@@ -203,17 +203,17 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new ApiError("User not found", 404);
+      throw new ApiError(404, "User not found");
     }
 
     // Compare old password
     const passwordMatch = await PasswordService.comparePassword(
       oldPassword,
-      user.password
+      user.password,
     );
 
     if (!passwordMatch) {
-      throw new ApiError("Invalid credentials", 401, [
+      throw new ApiError(401, "Invalid credentials", [
         "Current password is incorrect",
       ]);
     }
@@ -222,9 +222,9 @@ export class AuthService {
     const passwordValidation = PasswordService.validatePassword(newPassword);
     if (!passwordValidation.isValid) {
       throw new ApiError(
-        "Password does not meet requirements",
         400,
-        passwordValidation.errors
+        "Password does not meet requirements",
+        passwordValidation.errors,
       );
     }
 
@@ -258,7 +258,10 @@ export class AuthService {
 
     // Generate secure random token
     const resetToken = crypto.randomBytes(32).toString("hex");
-    const tokenHash = crypto.createHash("sha256").update(resetToken).digest("hex");
+    const tokenHash = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
 
     // Set token and expiration (1 hour from now)
     user.passwordResetToken = tokenHash;
@@ -271,11 +274,11 @@ export class AuthService {
       await emailService.sendPasswordResetEmail(
         user.email,
         user.name,
-        resetToken
+        resetToken,
       );
     } catch (error) {
       // Log error but don't fail the request
-      throw new ApiError("Failed to send reset email", 500, [
+      throw new ApiError(500, "Failed to send reset email", [
         "Please try again later",
       ]);
     }
@@ -296,14 +299,14 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new ApiError("Invalid or expired reset token", 400, [
+      throw new ApiError(400, "Invalid or expired reset token", [
         "Please request a new password reset link",
       ]);
     }
 
     // Check if token is expired
     if (!user.passwordResetExpires || user.passwordResetExpires < new Date()) {
-      throw new ApiError("Reset token has expired", 400, [
+      throw new ApiError(400, "Reset token has expired", [
         "Please request a new password reset link",
       ]);
     }
@@ -312,9 +315,9 @@ export class AuthService {
     const passwordValidation = PasswordService.validatePassword(newPassword);
     if (!passwordValidation.isValid) {
       throw new ApiError(
-        "Password does not meet requirements",
         400,
-        passwordValidation.errors
+        "Password does not meet requirements",
+        passwordValidation.errors,
       );
     }
 

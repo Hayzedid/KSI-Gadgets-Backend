@@ -1,7 +1,7 @@
 import Stripe from "stripe";
 import config from "../config/env";
 import { AppDataSource } from "../config/database";
-import { Order, PaymentStatus } from "../models/order.model";
+import { Order, PaymentStatus, PaymentMethod } from "../models/order.model";
 import { ApiError } from "../utils/ApiError";
 import logger from "../config/logger";
 
@@ -31,13 +31,16 @@ class PaymentService {
 
   constructor() {
     if (!config.stripeSecretKey) {
-      logger.warn("Stripe secret key not configured");
+      logger.warn(
+        "Stripe secret key not configured - payment features will be disabled",
+      );
+      this.stripe = null as any;
+    } else {
+      this.stripe = new Stripe(config.stripeSecretKey, {
+        apiVersion: "2026-02-25.clover" as any,
+        typescript: true,
+      });
     }
-
-    this.stripe = new Stripe(config.stripeSecretKey, {
-      apiVersion: "2024-12-18.acacia",
-      typescript: true,
-    });
   }
 
   /**
@@ -55,7 +58,7 @@ class PaymentService {
       });
 
       if (!order) {
-        throw new ApiError("Order not found", 404);
+        throw new ApiError(404, "Order not found");
       }
 
       // Use order's total amount
@@ -66,11 +69,11 @@ class PaymentService {
         // Retrieve existing payment intent
         try {
           const existingIntent = await this.stripe.paymentIntents.retrieve(
-            order.paymentTransactionId
+            order.paymentTransactionId,
           );
 
           if (existingIntent.status === "succeeded") {
-            throw new ApiError("Order already paid", 400);
+            throw new ApiError(400, "Order already paid");
           }
 
           // Return existing intent if still valid
@@ -126,8 +129,8 @@ class PaymentService {
       logger.error("Failed to create payment intent", { error, data });
       if (error instanceof ApiError) throw error;
       throw new ApiError(
+        500,
         error.message || "Failed to create payment intent",
-        500
       );
     }
   }
@@ -145,7 +148,7 @@ class PaymentService {
         await this.stripe.paymentIntents.retrieve(paymentIntentId);
 
       if (paymentIntent.status !== "succeeded") {
-        throw new ApiError("Payment not completed", 400);
+        throw new ApiError(400, "Payment not completed");
       }
 
       // Find order by payment intent ID
@@ -154,13 +157,13 @@ class PaymentService {
       });
 
       if (!order) {
-        throw new ApiError("Order not found", 404);
+        throw new ApiError(404, "Order not found");
       }
 
       // Update order payment status
       order.paymentStatus = PaymentStatus.COMPLETED;
       order.paymentMethod = this.getPaymentMethodType(
-        paymentIntent.payment_method
+        paymentIntent.payment_method,
       );
 
       await this.orderRepository.save(order);
@@ -177,7 +180,7 @@ class PaymentService {
     } catch (error: any) {
       logger.error("Failed to confirm payment", { error, paymentIntentId });
       if (error instanceof ApiError) throw error;
-      throw new ApiError(error.message || "Failed to confirm payment", 500);
+      throw new ApiError(500, error.message || "Failed to confirm payment");
     }
   }
 
@@ -202,7 +205,7 @@ class PaymentService {
       };
     } catch (error: any) {
       logger.error("Failed to get payment status", { error, paymentIntentId });
-      throw new ApiError(error.message || "Failed to get payment status", 500);
+      throw new ApiError(500, error.message || "Failed to get payment status");
     }
   }
 
@@ -211,9 +214,8 @@ class PaymentService {
    */
   async cancelPayment(paymentIntentId: string): Promise<boolean> {
     try {
-      const paymentIntent = await this.stripe.paymentIntents.cancel(
-        paymentIntentId
-      );
+      const paymentIntent =
+        await this.stripe.paymentIntents.cancel(paymentIntentId);
 
       // Update order status
       const order = await this.orderRepository.findOne({
@@ -233,7 +235,7 @@ class PaymentService {
       return paymentIntent.status === "canceled";
     } catch (error: any) {
       logger.error("Failed to cancel payment", { error, paymentIntentId });
-      throw new ApiError(error.message || "Failed to cancel payment", 500);
+      throw new ApiError(500, error.message || "Failed to cancel payment");
     }
   }
 
@@ -275,7 +277,7 @@ class PaymentService {
       };
     } catch (error: any) {
       logger.error("Failed to process refund", { error, data });
-      throw new ApiError(error.message || "Failed to process refund", 500);
+      throw new ApiError(500, error.message || "Failed to process refund");
     }
   }
 
@@ -284,14 +286,14 @@ class PaymentService {
    */
   async handleWebhook(
     rawBody: string,
-    signature: string
+    signature: string,
   ): Promise<{ received: boolean }> {
     try {
       // Verify webhook signature
       const event = this.stripe.webhooks.constructEvent(
         rawBody,
         signature,
-        config.stripeWebhookSecret
+        config.stripeWebhookSecret,
       );
 
       logger.info("Webhook received", { type: event.type });
@@ -321,7 +323,7 @@ class PaymentService {
       return { received: true };
     } catch (error: any) {
       logger.error("Webhook error", { error });
-      throw new ApiError(error.message || "Webhook handler failed", 400);
+      throw new ApiError(400, error.message || "Webhook handler failed");
     }
   }
 
@@ -342,7 +344,7 @@ class PaymentService {
     if (order && order.paymentStatus !== PaymentStatus.COMPLETED) {
       order.paymentStatus = PaymentStatus.COMPLETED;
       order.paymentMethod = this.getPaymentMethodType(
-        paymentIntent.payment_method
+        paymentIntent.payment_method,
       );
       await this.orderRepository.save(order);
 
@@ -401,11 +403,11 @@ class PaymentService {
     }
   }
 
-  private getPaymentMethodType(paymentMethod: any): string {
+  private getPaymentMethodType(paymentMethod: any): PaymentMethod {
     if (typeof paymentMethod === "string") {
-      return "card"; // Default
+      return PaymentMethod.CREDIT_CARD; // Default
     }
-    return paymentMethod?.type || "unknown";
+    return (paymentMethod?.type as PaymentMethod) || PaymentMethod.CREDIT_CARD;
   }
 }
 

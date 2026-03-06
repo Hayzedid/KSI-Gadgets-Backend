@@ -31,6 +31,7 @@ export enum PaymentMethod {
   PAYPAL = "paypal",
   BANK_TRANSFER = "bank_transfer",
   CASH_ON_DELIVERY = "cash_on_delivery",
+  CRYPTOCURRENCY = "cryptocurrency",
 }
 
 export interface OrderItem {

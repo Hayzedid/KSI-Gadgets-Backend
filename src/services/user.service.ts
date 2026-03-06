@@ -29,7 +29,7 @@ export class UserService {
     });
 
     if (!user) {
-      throw new ApiError("User not found", 404);
+      throw new ApiError(404, "User not found");
     }
 
     return this.formatUserProfile(user);
@@ -45,14 +45,14 @@ export class UserService {
 
   async updateUserProfile(
     userId: string,
-    dto: IUpdateProfileDTO
+    dto: IUpdateProfileDTO,
   ): Promise<IUserProfile> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
     });
 
     if (!user) {
-      throw new ApiError("User not found", 404);
+      throw new ApiError(404, "User not found");
     }
 
     // Update allowed fields
@@ -74,7 +74,7 @@ export class UserService {
 
   async getAllUsers(
     skip: number = 0,
-    take: number = 10
+    take: number = 10,
   ): Promise<{ users: IUserProfile[]; total: number }> {
     const [users, total] = await this.userRepository.findAndCount({
       skip,
@@ -94,7 +94,7 @@ export class UserService {
     });
 
     if (!user) {
-      throw new ApiError("User not found", 404);
+      throw new ApiError(404, "User not found");
     }
 
     user.isActive = false;
@@ -108,7 +108,7 @@ export class UserService {
     });
 
     if (!user) {
-      throw new ApiError("User not found", 404);
+      throw new ApiError(404, "User not found");
     }
 
     user.isActive = true;
@@ -122,7 +122,7 @@ export class UserService {
     });
 
     if (!user) {
-      throw new ApiError("User not found", 404);
+      throw new ApiError(404, "User not found");
     }
 
     // Soft delete by marking as inactive, or hard delete if required

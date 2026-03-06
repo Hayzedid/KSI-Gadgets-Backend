@@ -1,4 +1,4 @@
-import jwt from "jsonwebtoken";
+import jwt, { SignOptions } from "jsonwebtoken";
 import config from "../config/env";
 
 export interface ITokenPayload {
@@ -14,15 +14,17 @@ export interface IDecodedToken extends ITokenPayload {
 
 export class JwtService {
   static generateAccessToken(payload: ITokenPayload): string {
-    return jwt.sign(payload, config.jwtSecret, {
-      expiresIn: config.jwtAccessExpiration,
-    });
+    const options: SignOptions = {
+      expiresIn: config.jwtAccessExpiration as any,
+    };
+    return jwt.sign(payload, config.jwtSecret, options);
   }
 
   static generateRefreshToken(payload: ITokenPayload): string {
-    return jwt.sign(payload, config.jwtSecret, {
-      expiresIn: config.jwtRefreshExpiration,
-    });
+    const options: SignOptions = {
+      expiresIn: config.jwtRefreshExpiration as any,
+    };
+    return jwt.sign(payload, config.jwtSecret, options);
   }
 
   static verifyToken(token: string): IDecodedToken {

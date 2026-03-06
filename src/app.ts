@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import express, { Application } from "express";
+import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
@@ -11,14 +11,14 @@ import { requestLogger } from "./middlewares/requestLogger.middleware";
 import sanitizeRequest from "./middlewares/sanitize.middleware";
 import setupSwagger from "./docs/swagger";
 
-const app: Application = express();
+const app = express();
 
 // Security middleware
 app.use(helmet());
 app.use(cors());
 
 // Rate limiting
-app.use(rateLimiter);
+// app.use(rateLimiter);
 
 // Body parsing middleware
 app.use(express.json());

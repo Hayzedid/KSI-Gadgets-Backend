@@ -8,7 +8,7 @@ export const validate = (req: Request, res: Response, next: NextFunction) => {
   if (!errors.isEmpty()) {
     const extractedErrors = errors.array().map((err: any) => err.msg);
 
-    throw new ApiError("Validation error", 400, extractedErrors);
+    throw new ApiError(400, "Validation error", extractedErrors);
   }
 
   next();

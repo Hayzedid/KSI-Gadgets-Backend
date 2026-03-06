@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import ApiError from "../utils/ApiError";
+import { ApiError } from "../utils/ApiError";
 import httpStatus from "../constants/httpStatus";
 import config from "../config/env";
 import logger from "../config/logger";
@@ -11,7 +11,7 @@ export const errorHandler = (
   err: any,
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   let error = err;
 
@@ -20,7 +20,7 @@ export const errorHandler = (
     const statusCode =
       error.statusCode || error.status || httpStatus.INTERNAL_SERVER_ERROR;
     const message = error.message || "Internal Server Error";
-    error = new ApiError(statusCode, message, false, error.stack);
+    error = new ApiError(statusCode, message, [], false, error.stack);
   }
 
   // Log error
