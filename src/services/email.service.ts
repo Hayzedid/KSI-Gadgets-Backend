@@ -30,7 +30,9 @@ class EmailService {
   constructor() {
     // Skip email configuration if credentials are not provided
     if (!config.emailUser || !config.emailPassword) {
-      logger.warn("Email credentials not configured - emails will be logged only");
+      logger.warn(
+        "Email credentials not configured - emails will be logged only",
+      );
       this.transporter = null as any;
       return;
     }
@@ -68,10 +70,11 @@ class EmailService {
   async sendMail(options: EmailOptions): Promise<void> {
     // If transporter is not configured, just log the email
     if (!this.transporter) {
-      logger.info("[DEV MODE] Email would be sent", { 
-        to: options.to, 
+      logger.info("[DEV MODE] Email would be sent", {
+        to: options.to,
         subject: options.subject,
-        preview: options.text?.substring(0, 100) || options.html.substring(0, 100)
+        preview:
+          options.text?.substring(0, 100) || options.html.substring(0, 100),
       });
       return;
     }
@@ -118,7 +121,7 @@ class EmailService {
   async sendPasswordResetEmail(
     to: string,
     name: string,
-    resetToken: string
+    resetToken: string,
   ): Promise<void> {
     const resetUrl = `${config.clientUrl}/reset-password?token=${resetToken}`;
     const subject = "Password Reset Request - KSI Gadgets";
@@ -133,7 +136,7 @@ class EmailService {
    */
   async sendOrderConfirmationEmail(
     to: string,
-    orderData: OrderEmailData
+    orderData: OrderEmailData,
   ): Promise<void> {
     const subject = `Order Confirmation #${orderData.orderId} - KSI Gadgets`;
     const html = this.getOrderConfirmationEmailTemplate(orderData);
@@ -149,13 +152,13 @@ class EmailService {
     to: string,
     customerName: string,
     orderId: string,
-    status: string
+    status: string,
   ): Promise<void> {
     const subject = `Order Status Update #${orderId} - KSI Gadgets`;
     const html = this.getOrderStatusUpdateEmailTemplate(
       customerName,
       orderId,
-      status
+      status,
     );
     const text = `Hi ${customerName},\n\nYour order #${orderId} status has been updated to: ${status.toUpperCase()}\n\nYou can track your order status in your account dashboard.\n\nBest regards,\nThe KSI Gadgets Team`;
 
@@ -168,7 +171,7 @@ class EmailService {
   async sendOrderCancellationEmail(
     to: string,
     customerName: string,
-    orderId: string
+    orderId: string,
   ): Promise<void> {
     const subject = `Order Cancelled #${orderId} - KSI Gadgets`;
     const html = this.getOrderCancellationEmailTemplate(customerName, orderId);
@@ -335,7 +338,7 @@ class EmailService {
   private getPasswordResetEmailTemplate(
     name: string,
     resetUrl: string,
-    resetToken: string
+    resetToken: string,
   ): string {
     const content = `
       <h2>Password Reset Request</h2>
@@ -362,9 +365,7 @@ class EmailService {
     return this.getEmailLayout(content);
   }
 
-  private getOrderConfirmationEmailTemplate(
-    orderData: OrderEmailData
-  ): string {
+  private getOrderConfirmationEmailTemplate(orderData: OrderEmailData): string {
     const itemsHtml = orderData.items
       .map(
         (item) => `
@@ -374,7 +375,7 @@ class EmailService {
         <td style="text-align: right;">$${item.price.toFixed(2)}</td>
         <td style="text-align: right;">$${item.subtotal.toFixed(2)}</td>
       </tr>
-    `
+    `,
       )
       .join("");
 
@@ -421,7 +422,7 @@ class EmailService {
   private getOrderStatusUpdateEmailTemplate(
     customerName: string,
     orderId: string,
-    status: string
+    status: string,
   ): string {
     const statusMessages: Record<string, { title: string; message: string }> = {
       processing: {
@@ -469,7 +470,7 @@ class EmailService {
 
   private getOrderCancellationEmailTemplate(
     customerName: string,
-    orderId: string
+    orderId: string,
   ): string {
     const content = `
       <h2>Order Cancelled</h2>

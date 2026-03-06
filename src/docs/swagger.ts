@@ -8,7 +8,8 @@ const options = {
     info: {
       title: "KSI Gadgets E-Commercew API",
       version: "1.0.0",
-      description: "Complete e-commerce backend with user management, authentication, products, cart, and orders",
+      description:
+        "Complete e-commerce backend with user management, authentication, products, cart, and orders",
       contact: {
         name: "KSI Gadgets",
       },
@@ -41,7 +42,11 @@ const options = {
 const specs = swaggerJsdoc(options);
 
 export const setupSwagger = (app: Express) => {
-  app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(specs, { swaggerOptions: { persistAuthorization: true } }));
+  app.use(
+    "/api-docs",
+    swaggerUi.serve,
+    swaggerUi.setup(specs, { swaggerOptions: { persistAuthorization: true } }),
+  );
 };
 
 export default setupSwagger;
