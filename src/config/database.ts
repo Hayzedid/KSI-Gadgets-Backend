@@ -15,7 +15,7 @@ export const AppDataSource = new DataSource({
   password: config.dbPassword,
   database: config.dbName,
   synchronize: config.env === "development", // Auto-create tables in development
-  logging: config.env === "development",
+  logging: false, // Disable query logging
   entities: [User, Product, Review, Cart, CartItem, Order],
   migrations: ["src/migrations/**/*.ts"],
   subscribers: [],

@@ -23,5 +23,10 @@ declare module "coinbase-commerce-node" {
       signature: string,
       secret: string,
     ): any;
+    static verifyEventBody(
+      rawBody: string,
+      signature: string,
+      secret: string,
+    ): any;
   }
 }
