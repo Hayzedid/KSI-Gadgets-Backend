@@ -1,6 +1,6 @@
 {
   "name": "ksi-gadgets-backend",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "E-commerce backend for KSI Gadgets",
   "main": "dist/server.js",
   "scripts": {
