@@ -1,6 +1,7 @@
 import { AppDataSource } from "../config/database";
 import { Product, ProductCategory } from "../models/product.model";
 import { Review } from "../models/review.model";
+import { CartItem } from "../models/cart-item.model";
 import { ApiError } from "../utils/ApiError";
 import { ILike, Between, FindOptionsWhere } from "typeorm";
 
@@ -22,10 +23,11 @@ interface IPaginationOptions {
 export class ProductService {
   private productRepository = AppDataSource.getRepository(Product);
   private reviewRepository = AppDataSource.getRepository(Review);
+  private cartItemRepository = AppDataSource.getRepository(CartItem);
 
   async getAllProducts(
     filters: IProductFilter,
-    pagination: IPaginationOptions
+    pagination: IPaginationOptions,
   ) {
     const { category, minPrice, maxPrice, search, featured } = filters;
     const {
@@ -90,7 +92,7 @@ export class ProductService {
 
   async updateProduct(
     productId: string,
-    updateData: Partial<Product>
+    updateData: Partial<Product>,
   ): Promise<Product> {
     const product = await this.getProductById(productId);
 
@@ -101,8 +103,9 @@ export class ProductService {
   async deleteProduct(productId: string): Promise<void> {
     const product = await this.getProductById(productId);
 
-    // Delete all reviews associated with this product (cascade should handle this)
+    // Remove dependent rows before deleting the product to avoid FK conflicts.
     await this.reviewRepository.delete({ productId });
+    await this.cartItemRepository.delete({ productId });
     await this.productRepository.remove(product);
   }
 
@@ -122,7 +125,7 @@ export class ProductService {
     productId: string,
     userId: string,
     rating: number,
-    comment: string
+    comment: string,
   ) {
     const product = await this.getProductById(productId);
 
@@ -161,7 +164,7 @@ export class ProductService {
     reviewId: string,
     userId: string,
     rating: number,
-    comment: string
+    comment: string,
   ) {
     const review = await this.reviewRepository.findOne({
       where: { id: reviewId, userId },

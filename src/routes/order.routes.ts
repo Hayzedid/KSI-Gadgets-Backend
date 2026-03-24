@@ -26,7 +26,7 @@ router.get(
   "/my-orders",
   orderValidator.getOrdersQueryValidator,
   validate,
-  orderController.getMyOrders
+  orderController.getMyOrders,
 );
 
 /**
@@ -42,31 +42,6 @@ router.get(
  *         description: Order statistics
  */
 router.get("/my-stats", orderController.getUserOrderStats);
-
-/**
- * @swagger
- * /api/orders/{id}:
- *   get:
- *     summary: Get order by ID
- *     tags: [Orders]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Order details
- */
-router.get(
-  "/:id",
-  orderValidator.orderIdValidator,
-  validate,
-  orderController.getOrderById
-);
 
 /**
  * @swagger
@@ -98,7 +73,7 @@ router.post(
   "/",
   orderValidator.createOrderValidator,
   validate,
-  orderController.createOrder
+  orderController.createOrder,
 );
 
 /**
@@ -123,7 +98,7 @@ router.post(
   "/:id/cancel",
   orderValidator.cancelOrderValidator,
   validate,
-  orderController.cancelOrder
+  orderController.cancelOrder,
 );
 
 /**
@@ -143,7 +118,7 @@ router.get(
   authorize(UserRole.ADMIN),
   orderValidator.getOrdersQueryValidator,
   validate,
-  orderController.getAllOrders
+  orderController.getAllOrders,
 );
 
 /**
@@ -194,7 +169,7 @@ router.put(
   authorize(UserRole.ADMIN),
   orderValidator.updateOrderStatusValidator,
   validate,
-  orderController.updateOrderStatus
+  orderController.updateOrderStatus,
 );
 
 /**
@@ -231,7 +206,32 @@ router.put(
   authorize(UserRole.ADMIN),
   orderValidator.updatePaymentStatusValidator,
   validate,
-  orderController.updatePaymentStatus
+  orderController.updatePaymentStatus,
+);
+
+/**
+ * @swagger
+ * /api/orders/{id}:
+ *   get:
+ *     summary: Get order by ID
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Order details
+ */
+router.get(
+  "/:id",
+  orderValidator.orderIdValidator,
+  validate,
+  orderController.getOrderById,
 );
 
 export default router;

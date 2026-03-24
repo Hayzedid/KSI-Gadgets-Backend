@@ -6,6 +6,7 @@ import {
   OrderItem,
 } from "../models/order.model";
 import { Cart } from "../models/cart.model";
+import { CartItem } from "../models/cart-item.model";
 import { Product } from "../models/product.model";
 import { User } from "../models/user.model";
 import { ApiError } from "../utils/ApiError";
@@ -24,6 +25,7 @@ interface CreateOrderInput {
 export class OrderService {
   private orderRepository = AppDataSource.getRepository(Order);
   private cartRepository = AppDataSource.getRepository(Cart);
+  private cartItemRepository = AppDataSource.getRepository(CartItem);
   private productRepository = AppDataSource.getRepository(Product);
   private userRepository = AppDataSource.getRepository(User);
 
@@ -35,7 +37,7 @@ export class OrderService {
 
   async createOrder(
     userId: string,
-    orderData: CreateOrderInput
+    orderData: CreateOrderInput,
   ): Promise<Order> {
     // Get user's cart
     const cart = await this.cartRepository.findOne({
@@ -102,8 +104,9 @@ export class OrderService {
     const savedOrder = await this.orderRepository.save(order);
 
     // Clear cart
-    await this.cartRepository.update({ userId }, { items: [], totalAmount: 0 });
-// Send order confirmation email (fire-and-forget)
+    await this.cartItemRepository.delete({ cartId: cart.id });
+    await this.cartRepository.update({ id: cart.id }, { totalAmount: 0 });
+    // Send order confirmation email (fire-and-forget)
     try {
       const user = await this.userRepository.findOne({ where: { id: userId } });
       if (user) {
@@ -130,7 +133,6 @@ export class OrderService {
       // swallow email errors
     }
 
-    
     return savedOrder;
   }
 
@@ -195,7 +197,7 @@ export class OrderService {
     if (search) {
       queryBuilder.andWhere(
         "(order.orderNumber LIKE :search OR user.name LIKE :search OR user.email LIKE :search)",
-        { search: `%${search}%` }
+        { search: `%${search}%` },
       );
     }
 
@@ -217,7 +219,7 @@ export class OrderService {
   async updateOrderStatus(
     orderId: string,
     status: OrderStatus,
-    trackingNumber?: string
+    trackingNumber?: string,
   ): Promise<Order> {
     const order = await this.getOrderById(orderId);
 
@@ -248,7 +250,7 @@ export class OrderService {
             user.email,
             user.name,
             order.orderNumber,
-            status
+            status,
           )
           .catch(() => {});
       }
@@ -262,7 +264,7 @@ export class OrderService {
   async cancelOrder(
     orderId: string,
     userId: string,
-    reason: string
+    reason: string,
   ): Promise<Order> {
     const order = await this.getOrderById(orderId, userId);
 
@@ -315,7 +317,7 @@ export class OrderService {
   async updatePaymentStatus(
     orderId: string,
     paymentStatus: PaymentStatus,
-    paymentTransactionId?: string
+    paymentTransactionId?: string,
   ): Promise<Order> {
     const order = await this.getOrderById(orderId);
 
