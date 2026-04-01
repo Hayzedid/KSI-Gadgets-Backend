@@ -97,7 +97,7 @@ class CryptoPaymentService {
         description:
           data.description || `Payment for Order ${order.orderNumber}`,
         local_price: {
-          amount: order.totalAmount.toFixed(2),
+          amount: parseFloat(order.totalAmount as any).toFixed(2),
           currency: "USD",
         },
         pricing_type: "fixed_price",

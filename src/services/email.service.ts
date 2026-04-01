@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { Resend } from "resend";
 import config from "../config/env";
 import logger from "../config/logger";
 
@@ -7,6 +8,11 @@ interface EmailOptions {
   subject: string;
   html: string;
   text?: string;
+}
+
+interface ResolvedRecipients {
+  to: string | string[];
+  originalTo: string | string[];
 }
 
 interface OrderEmailData {
@@ -25,19 +31,42 @@ interface OrderEmailData {
 }
 
 class EmailService {
-  private transporter: nodemailer.Transporter;
+  private transporter: nodemailer.Transporter | null;
+  private resendClient: Resend | null;
+  private emailProvider: "smtp" | "resend" | "disabled";
 
   constructor() {
-    // Skip email configuration if credentials are not provided
-    if (!config.emailUser || !config.emailPassword) {
-      logger.warn(
-        "Email credentials not configured - emails will be logged only",
-      );
-      this.transporter = null as any;
+    this.transporter = null;
+    this.resendClient = null;
+    this.emailProvider = "disabled";
+
+    const provider = (config.emailProvider || "smtp").toLowerCase();
+    const shouldUseResend =
+      provider === "resend" ||
+      (!!config.resendApiKey && (!config.emailUser || !config.emailPassword));
+
+    if (shouldUseResend) {
+      if (!config.resendApiKey) {
+        logger.warn(
+          "EMAIL_PROVIDER is resend but RESEND_API_KEY is missing - emails will be logged only",
+        );
+        return;
+      }
+
+      this.resendClient = new Resend(config.resendApiKey);
+      this.emailProvider = "resend";
+      logger.info("Email service configured with Resend");
       return;
     }
 
-    // Create transporter with email configuration
+    // SMTP fallback
+    if (!config.emailUser || !config.emailPassword) {
+      logger.warn(
+        "SMTP credentials not configured - emails will be logged only",
+      );
+      return;
+    }
+
     this.transporter = nodemailer.createTransport({
       host: config.emailHost,
       port: config.emailPort,
@@ -47,9 +76,24 @@ class EmailService {
         pass: config.emailPassword,
       },
     });
+    this.emailProvider = "smtp";
 
     // Verify transporter configuration on startup (non-blocking)
     this.verifyConnection();
+  }
+
+  private resolveRecipients(to: string | string[]): ResolvedRecipients {
+    if (config.emailForceTo) {
+      return {
+        to: config.emailForceTo,
+        originalTo: to,
+      };
+    }
+
+    return {
+      to,
+      originalTo: to,
+    };
   }
 
   private async verifyConnection(): Promise<void> {
@@ -68,40 +112,88 @@ class EmailService {
    * Send email with provided options
    */
   async sendMail(options: EmailOptions): Promise<void> {
-    // If transporter is not configured, just log the email
-    if (!this.transporter) {
+    const recipients = this.resolveRecipients(options.to);
+
+    if (this.emailProvider === "resend" && this.resendClient) {
+      try {
+        const result = await this.resendClient.emails.send({
+          from: `KSI Gadgets <${config.emailFrom}>`,
+          to: Array.isArray(recipients.to) ? recipients.to : [recipients.to],
+          subject: options.subject,
+          html: options.html,
+          text: options.text,
+        });
+
+        logger.info("Email sent successfully via Resend", {
+          messageId: result.data?.id,
+          to: recipients.to,
+          originalTo: recipients.originalTo,
+          subject: options.subject,
+        });
+        return;
+      } catch (error) {
+        logger.error("Failed to send email via Resend", {
+          error,
+          to: recipients.to,
+          originalTo: recipients.originalTo,
+          subject: options.subject,
+        });
+        throw new Error("Failed to send email");
+      }
+    }
+
+    if (this.emailProvider === "smtp" && this.transporter) {
+      const mailOptions = {
+        from: `KSI Gadgets <${config.emailFrom}>`,
+        to: recipients.to,
+        subject: options.subject,
+        text: options.text,
+        html: options.html,
+      };
+
+      try {
+        const info = await this.transporter.sendMail(mailOptions);
+        logger.info("Email sent successfully", {
+          messageId: info.messageId,
+          to: recipients.to,
+          originalTo: recipients.originalTo,
+          subject: options.subject,
+        });
+        return;
+      } catch (error) {
+        logger.error("Failed to send email", {
+          error,
+          to: recipients.to,
+          originalTo: recipients.originalTo,
+          subject: options.subject,
+        });
+        throw new Error("Failed to send email");
+      }
+    }
+
+    // If no provider is configured, just log the email
+    if (this.emailProvider === "disabled") {
       logger.info("[DEV MODE] Email would be sent", {
-        to: options.to,
+        to: recipients.to,
+        originalTo: recipients.originalTo,
         subject: options.subject,
         preview:
           options.text?.substring(0, 100) || options.html.substring(0, 100),
       });
       return;
     }
+  }
 
-    const mailOptions = {
-      from: `KSI Gadgets <${config.emailFrom}>`,
-      to: options.to,
-      subject: options.subject,
-      text: options.text,
-      html: options.html,
-    };
+  async sendOrderConfirmation(
+    to: string,
+    orderId: string,
+    detailsHtml: string,
+  ): Promise<void> {
+    const subject = `Order Confirmation - ${orderId}`;
+    const html = `<p>Thanks for your order. Order ID: ${orderId}</p>${detailsHtml}`;
+    const text = `Thanks for your order. Order ID: ${orderId}`;
 
-    try {
-      const info = await this.transporter.sendMail(mailOptions);
-      logger.info("Email sent successfully", {
-        messageId: info.messageId,
-        to: options.to,
-        subject: options.subject,
-      });
-    } catch (error) {
-      logger.error("Failed to send email", {
-        error,
-        to: options.to,
-        subject: options.subject,
-      });
-      throw new Error("Failed to send email");
-    }
+    await this.sendMail({ to, subject, html, text });
   }
 
   /**

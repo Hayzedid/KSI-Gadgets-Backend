@@ -14,11 +14,14 @@ interface Config {
   jwtSecret: string;
   jwtAccessExpiration: string;
   jwtRefreshExpiration: string;
+  emailProvider: string;
   emailHost: string;
   emailPort: number;
   emailUser: string;
   emailPassword: string;
   emailFrom: string;
+  resendApiKey: string;
+  emailForceTo: string;
   clientUrl: string;
   stripeSecretKey: string;
   stripePublishableKey: string;
@@ -38,11 +41,14 @@ const config: Config = {
   jwtSecret: process.env.JWT_SECRET || "your-secret-key-change-this",
   jwtAccessExpiration: process.env.JWT_ACCESS_EXPIRATION || "15m",
   jwtRefreshExpiration: process.env.JWT_REFRESH_EXPIRATION || "7d",
+  emailProvider: process.env.EMAIL_PROVIDER || "smtp",
   emailHost: process.env.EMAIL_HOST || "smtp.gmail.com",
   emailPort: parseInt(process.env.EMAIL_PORT || "587", 10),
   emailUser: process.env.EMAIL_USER || "",
   emailPassword: process.env.EMAIL_PASSWORD || "",
   emailFrom: process.env.EMAIL_FROM || "noreply@ksi-gadgets.com",
+  resendApiKey: process.env.RESEND_API_KEY || "",
+  emailForceTo: process.env.EMAIL_FORCE_TO || "",
   clientUrl: process.env.CLIENT_URL || "http://localhost:3000",
   stripeSecretKey: process.env.STRIPE_SECRET_KEY || "",
   stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || "",
