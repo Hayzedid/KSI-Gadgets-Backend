@@ -42,6 +42,7 @@ export class AuthController {
         {
           user: result.user,
           accessToken: result.accessToken,
+          refreshToken: result.refreshToken, // Also return in body for frontend storage
         },
         "Login successful"
       )

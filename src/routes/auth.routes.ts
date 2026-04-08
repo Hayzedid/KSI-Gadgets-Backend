@@ -219,10 +219,10 @@ router.post("/logout", authenticate, AuthController.logout);
  *           schema:
  *             type: object
  *             required:
- *               - currentPassword
+ *               - oldPassword
  *               - newPassword
  *             properties:
- *               currentPassword:
+ *               oldPassword:
  *                 type: string
  *               newPassword:
  *                 type: string

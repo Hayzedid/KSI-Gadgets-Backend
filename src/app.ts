@@ -37,7 +37,7 @@ app.use(
 );
 
 // Rate limiting
-// app.use(rateLimiter);
+app.use(rateLimiter);
 
 // Body parsing middleware
 app.use(express.json());
