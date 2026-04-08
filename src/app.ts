@@ -13,7 +13,9 @@ import setupSwagger from "./docs/swagger";
 
 const app = express();
 
-const allowedOrigins = (process.env.CLIENT_URL || "http://localhost:3000,http://localhost:5173")
+const allowedOrigins = (
+  process.env.CLIENT_URL || "http://localhost:3000,http://localhost:5173"
+)
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);

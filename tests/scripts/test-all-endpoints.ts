@@ -37,7 +37,11 @@ function logFail(error: unknown): void {
 }
 
 function expectStatus(step: string, status: number, expected: number): void {
-  assert.equal(status, expected, `${step} expected ${expected}, received ${status}`);
+  assert.equal(
+    status,
+    expected,
+    `${step} expected ${expected}, received ${status}`,
+  );
 }
 
 async function main(): Promise<void> {
@@ -170,7 +174,11 @@ async function main(): Promise<void> {
       email: makeEmail("delete-me"),
       password: "TestPass123!",
     });
-    expectStatus("POST /api/auth/register (deletable user)", response.status, 201);
+    expectStatus(
+      "POST /api/auth/register (deletable user)",
+      response.status,
+      201,
+    );
     extraUserId = response.body?.data?.user?.id ?? "";
     assert.ok(extraUserId);
     logPass();
@@ -280,7 +288,11 @@ async function main(): Promise<void> {
     response = await api
       .delete(`/api/products/reviews/${reviewId}`)
       .set("Authorization", `Bearer ${customerToken}`);
-    expectStatus("DELETE /api/products/reviews/:reviewId", response.status, 200);
+    expectStatus(
+      "DELETE /api/products/reviews/:reviewId",
+      response.status,
+      200,
+    );
     logPass();
 
     logStep("PUT /api/products/:id");
@@ -504,7 +516,11 @@ async function main(): Promise<void> {
     response = await api
       .get(`/api/payments/status/${paymentIntentId}`)
       .set("Authorization", `Bearer ${customerToken}`);
-    expectStatus("GET /api/payments/status/:paymentIntentId", response.status, 200);
+    expectStatus(
+      "GET /api/payments/status/:paymentIntentId",
+      response.status,
+      200,
+    );
     logPass();
 
     logStep("POST /api/payments/cancel");
@@ -537,7 +553,11 @@ async function main(): Promise<void> {
       .post("/api/crypto-payments/create-charge")
       .set("Authorization", `Bearer ${customerToken}`)
       .send({ orderId, description: "Crypto checkout" });
-    expectStatus("POST /api/crypto-payments/create-charge", response.status, 200);
+    expectStatus(
+      "POST /api/crypto-payments/create-charge",
+      response.status,
+      200,
+    );
     assert.equal(response.body?.data?.chargeId, chargeId);
     logPass();
 
@@ -545,7 +565,11 @@ async function main(): Promise<void> {
     response = await api
       .get(`/api/crypto-payments/charge/${chargeId}`)
       .set("Authorization", `Bearer ${customerToken}`);
-    expectStatus("GET /api/crypto-payments/charge/:chargeId", response.status, 200);
+    expectStatus(
+      "GET /api/crypto-payments/charge/:chargeId",
+      response.status,
+      200,
+    );
     logPass();
 
     logStep("GET /api/crypto-payments/order/:orderId/charges");
@@ -589,7 +613,11 @@ async function main(): Promise<void> {
       email: makeEmail("self-delete"),
       password: "TestPass123!",
     });
-    expectStatus("POST /api/auth/register (self delete)", selfDelete.status, 201);
+    expectStatus(
+      "POST /api/auth/register (self delete)",
+      selfDelete.status,
+      201,
+    );
     const selfDeleteToken = selfDelete.body?.data?.accessToken ?? "";
     assert.ok(selfDeleteToken);
 
