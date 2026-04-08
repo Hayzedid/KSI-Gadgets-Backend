@@ -10,6 +10,7 @@
     "postinstall": "npm run build",
     "test": "npx jest",
     "test:endpoints": "npx jest tests/integration/endpoints.test.ts --runInBand",
+    "smoke:endpoints": "tsx tests/scripts/test-all-endpoints.ts",
     "test:watch": "npx jest --watch",
     "test:coverage": "npx jest --coverage"
   },
