@@ -10,11 +10,6 @@ module.exports = {
   verbose: true,
   testTimeout: 60000,
   transform: {
-    "^.+\\.(ts|tsx)$": [
-      "ts-jest",
-      {
-        isolatedModules: true,
-      },
-    ],
+    "^.+\\.(ts|tsx)$": ["ts-jest", {}],
   },
 };

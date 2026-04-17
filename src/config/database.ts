@@ -6,6 +6,7 @@ import { Review } from "../models/review.model";
 import { Cart } from "../models/cart.model";
 import { CartItem } from "../models/cart-item.model";
 import { Order } from "../models/order.model";
+import { WishlistItem } from "../models/wishlist-item.model";
 
 export const AppDataSource = new DataSource({
   type: "postgres",
@@ -16,7 +17,7 @@ export const AppDataSource = new DataSource({
   database: config.dbName,
   synchronize: config.env === "development", // Auto-create tables in development
   logging: false, // Disable query logging
-  entities: [User, Product, Review, Cart, CartItem, Order],
+  entities: [User, Product, Review, Cart, CartItem, Order, WishlistItem],
   migrations: ["src/migrations/**/*.ts"],
   subscribers: [],
   ssl: {

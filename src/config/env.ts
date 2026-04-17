@@ -49,7 +49,8 @@ const config: Config = {
   emailFrom: process.env.EMAIL_FROM || "noreply@ksi-gadgets.com",
   resendApiKey: process.env.RESEND_API_KEY || "",
   emailForceTo: process.env.EMAIL_FORCE_TO || "",
-  clientUrl: process.env.CLIENT_URL || "http://localhost:3000",
+  clientUrl:
+    process.env.CLIENT_URL || "http://localhost:3000,http://localhost:5173",
   stripeSecretKey: process.env.STRIPE_SECRET_KEY || "",
   stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",

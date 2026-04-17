@@ -6,6 +6,8 @@ import cartRoutes from "./cart.routes";
 import orderRoutes from "./order.routes";
 import paymentRoutes from "./payment.routes";
 import cryptoPaymentRoutes from "./crypto-payment.routes";
+import wishlistRoutes from "./wishlist.routes";
+import supportRoutes from "./support.routes";
 
 const router = Router();
 
@@ -17,5 +19,7 @@ router.use("/cart", cartRoutes);
 router.use("/orders", orderRoutes);
 router.use("/payments", paymentRoutes);
 router.use("/crypto-payments", cryptoPaymentRoutes);
+router.use("/wishlist", wishlistRoutes);
+router.use("/support", supportRoutes);
 
 export default router;
