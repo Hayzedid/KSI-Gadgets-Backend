@@ -44,13 +44,33 @@ export const createProductValidator = [
     .isInt({ min: 0 })
     .withMessage("Stock must be a non-negative integer"),
 
+  body("imageUrl")
+    .optional()
+    .trim()
+    .notEmpty()
+    .withMessage("imageUrl cannot be empty"),
+
   body("images")
+    .optional()
     .isArray({ min: 1 })
     .withMessage("At least one image is required"),
 
   body("images.*")
     .isString()
     .withMessage("Each image must be a valid string/URL"),
+
+  body().custom((_, { req }) => {
+    const hasImages =
+      Array.isArray(req.body.images) && req.body.images.length > 0;
+    const hasImageUrl =
+      typeof req.body.imageUrl === "string" && req.body.imageUrl.trim().length > 0;
+
+    if (hasImages || hasImageUrl) {
+      return true;
+    }
+
+    throw new Error("Either images or imageUrl is required");
+  }),
 
   body("featured")
     .optional()
@@ -96,6 +116,12 @@ export const updateProductValidator = [
     .optional()
     .isInt({ min: 0 })
     .withMessage("Stock must be a non-negative integer"),
+
+  body("imageUrl")
+    .optional()
+    .trim()
+    .notEmpty()
+    .withMessage("imageUrl cannot be empty"),
 
   body("images")
     .optional()

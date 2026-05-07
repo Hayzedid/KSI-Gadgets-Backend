@@ -218,6 +218,10 @@ router.delete(
  *                 type: string
  *               stock:
  *                 type: integer
+ *               images:
+ *                 type: array
+ *                 items:
+ *                   type: string
  *               imageUrl:
  *                 type: string
  *     responses:
@@ -262,6 +266,12 @@ router.post(
  *                 type: number
  *               stock:
  *                 type: integer
+ *               images:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               imageUrl:
+ *                 type: string
  *     responses:
  *       200:
  *         description: Product updated

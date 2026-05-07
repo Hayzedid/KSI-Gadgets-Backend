@@ -7,6 +7,20 @@ import { ProductCategory } from "../models/product.model";
 
 const productService = new ProductService();
 
+const normalizeProductPayload = (payload: Record<string, unknown>) => {
+  const { imageUrl, images, ...rest } = payload;
+
+  if (Array.isArray(images) && images.length > 0) {
+    return { ...rest, images };
+  }
+
+  if (typeof imageUrl === "string" && imageUrl.trim()) {
+    return { ...rest, images: [imageUrl.trim()] };
+  }
+
+  return { ...rest, images };
+};
+
 export const getAllProducts = asyncHandler(
   async (req: IAuthRequest, res: Response) => {
     const filters = {
@@ -50,7 +64,9 @@ export const getProductById = asyncHandler(
 
 export const createProduct = asyncHandler(
   async (req: IAuthRequest, res: Response) => {
-    const product = await productService.createProduct(req.body);
+    const product = await productService.createProduct(
+      normalizeProductPayload(req.body),
+    );
 
     res
       .status(201)
@@ -60,7 +76,10 @@ export const createProduct = asyncHandler(
 
 export const updateProduct = asyncHandler(
   async (req: IAuthRequest, res: Response) => {
-    const product = await productService.updateProduct(req.params.id, req.body);
+    const product = await productService.updateProduct(
+      req.params.id,
+      normalizeProductPayload(req.body),
+    );
 
     res
       .status(200)
