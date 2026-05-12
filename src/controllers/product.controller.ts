@@ -7,18 +7,18 @@ import { ProductCategory } from "../models/product.model";
 
 const productService = new ProductService();
 
-const normalizeProductPayload = (payload: Record<string, unknown>) => {
+const normalizeProductPayload = (payload: Record<string, unknown>): Record<string, unknown> & { images?: string[] } => {
   const { imageUrl, images, ...rest } = payload;
 
   if (Array.isArray(images) && images.length > 0) {
-    return { ...rest, images };
+    return { ...rest, images: images as string[] };
   }
 
   if (typeof imageUrl === "string" && imageUrl.trim()) {
     return { ...rest, images: [imageUrl.trim()] };
   }
 
-  return { ...rest, images };
+  return { ...rest, images: images as string[] | undefined };
 };
 
 export const getAllProducts = asyncHandler(
