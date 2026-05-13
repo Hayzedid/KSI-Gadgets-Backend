@@ -7,18 +7,29 @@ import { ProductCategory } from "../models/product.model";
 
 const productService = new ProductService();
 
-const normalizeProductPayload = (payload: Record<string, unknown>) => {
-  const { imageUrl, images, ...rest } = payload;
+const normalizeProductPayload = (
+  payload: Record<string, unknown>,
+): Partial<import("../models/product.model").Product> => {
+  const { imageUrl, images, ...rest } = payload as any;
+
+  let normalizedImages: string[] | undefined = undefined;
 
   if (Array.isArray(images) && images.length > 0) {
-    return { ...rest, images };
+    normalizedImages = images
+      .filter((i: unknown) => typeof i === "string")
+      .map((s: string) => s.trim())
+      .filter(Boolean);
+  } else if (typeof imageUrl === "string" && imageUrl.trim()) {
+    normalizedImages = [imageUrl.trim()];
   }
 
-  if (typeof imageUrl === "string" && imageUrl.trim()) {
-    return { ...rest, images: [imageUrl.trim()] };
-  }
+  const result: Partial<import("../models/product.model").Product> = {
+    ...(rest as Partial<import("../models/product.model").Product>),
+  };
 
-  return { ...rest, images };
+  if (normalizedImages !== undefined) result.images = normalizedImages;
+
+  return result;
 };
 
 export const getAllProducts = asyncHandler(
