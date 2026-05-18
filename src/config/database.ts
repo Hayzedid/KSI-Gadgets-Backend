@@ -20,8 +20,14 @@ export const AppDataSource = new DataSource({
   entities: [User, Product, Review, Cart, CartItem, Order, WishlistItem],
   migrations: ["src/migrations/**/*.ts"],
   subscribers: [],
+  // SSL is required for some hosted Postgres providers (eg. Neon).
+  // TypeORM passes this through to the `pg` driver.
   ssl: {
-    rejectUnauthorized: false, // Required for Neon database
+    rejectUnauthorized: false,
+  },
+  // Pass driver-specific options via `extra` — include a connection timeout
+  extra: {
+    connectionTimeoutMillis: 10000,
   },
 });
 
@@ -30,7 +36,18 @@ export const connectDatabase = async (): Promise<void> => {
     await AppDataSource.initialize();
     console.log("✅ PostgreSQL database connected successfully");
   } catch (error) {
-    console.error("❌ Error connecting to PostgreSQL database:", error);
+    console.error("❌ Error connecting to PostgreSQL database:");
+    // Log AggregateError inner errors when present for clearer diagnostics
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const e: any = error;
+    if (e && e.errors && Array.isArray(e.errors)) {
+      console.error("Aggregate errors:");
+      for (const sub of e.errors) {
+        console.error(sub);
+      }
+    } else {
+      console.error(e);
+    }
     process.exit(1);
   }
 };
