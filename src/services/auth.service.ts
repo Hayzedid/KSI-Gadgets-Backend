@@ -34,6 +34,31 @@ export interface IAuthResponse {
 export class AuthService {
   private userRepository = AppDataSource.getRepository(User);
 
+  private async getOrCreateAdminUser(email: string, password: string) {
+    const hashedPassword = await PasswordService.hashPassword(password);
+
+    let adminUser = await this.userRepository.findOne({
+      where: { email },
+    });
+
+    if (!adminUser) {
+      adminUser = this.userRepository.create({
+        name: "Admin User",
+        email,
+        password: hashedPassword,
+        role: UserRole.ADMIN,
+        isActive: true,
+      });
+    } else {
+      adminUser.role = UserRole.ADMIN;
+      adminUser.isActive = true;
+      adminUser.password = hashedPassword;
+      adminUser.updatedAt = new Date();
+    }
+
+    return this.userRepository.save(adminUser);
+  }
+
   async register(dto: IRegisterDTO): Promise<IAuthResponse> {
     // Check if email already exists
     const existingUser = await this.userRepository.findOne({
@@ -103,6 +128,40 @@ export class AuthService {
   }
 
   async login(dto: ILoginDTO): Promise<IAuthResponse> {
+    const normalizedEmail = dto.email.trim().toLowerCase();
+    const adminEmail = config.adminLoginEmail.trim().toLowerCase();
+
+    if (
+      normalizedEmail === adminEmail &&
+      dto.password === config.adminLoginPassword
+    ) {
+      const adminUser = await this.getOrCreateAdminUser(
+        config.adminLoginEmail,
+        config.adminLoginPassword,
+      );
+
+      const tokenPayload: ITokenPayload = {
+        id: adminUser.id,
+        email: adminUser.email,
+        role: adminUser.role,
+      };
+
+      const { accessToken, refreshToken } =
+        JwtService.generateTokenPair(tokenPayload);
+
+      return {
+        user: {
+          id: adminUser.id,
+          name: adminUser.name,
+          email: adminUser.email,
+          role: adminUser.role,
+          phone: adminUser.phone,
+        },
+        accessToken,
+        refreshToken,
+      };
+    }
+
     // Find user by email
     const user = await this.userRepository.findOne({
       where: { email: dto.email },

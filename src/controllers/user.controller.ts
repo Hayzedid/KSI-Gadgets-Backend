@@ -51,7 +51,7 @@ export class UserController {
         throw new Error("User ID not found");
       }
 
-      await userService.deleteUserAccount(userId);
+      await userService.deleteUserAccount(userId, userId);
 
       return res
         .status(200)
@@ -63,8 +63,15 @@ export class UserController {
   static getAllUsers = asyncHandler(
     async (req: IAuthRequest, res: Response) => {
       const { skip = 0, take = 10 } = req.query;
+      const search = req.query.search as string | undefined;
+      const status = req.query.status as string | undefined;
 
-      const result = await userService.getAllUsers(Number(skip), Number(take));
+      const result = await userService.getAllUsers(
+        Number(skip),
+        Number(take),
+        search,
+        status,
+      );
 
       return res
         .status(200)
@@ -87,8 +94,9 @@ export class UserController {
   static deactivateUser = asyncHandler(
     async (req: IAuthRequest, res: Response) => {
       const { userId } = req.params;
+      const actorUserId = req.user?.id;
 
-      await userService.deactivateUser(userId);
+      await userService.deactivateUser(userId, actorUserId);
 
       return res
         .status(200)
@@ -110,8 +118,9 @@ export class UserController {
 
   static deleteUser = asyncHandler(async (req: IAuthRequest, res: Response) => {
     const { userId } = req.params;
+    const actorUserId = req.user?.id;
 
-    await userService.deleteUserAccount(userId);
+    await userService.deleteUserAccount(userId, actorUserId);
 
     return res
       .status(200)

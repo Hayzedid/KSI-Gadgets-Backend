@@ -28,6 +28,8 @@ interface Config {
   stripeWebhookSecret: string;
   coinbaseApiKey: string;
   coinbaseWebhookSecret: string;
+  adminLoginEmail: string;
+  adminLoginPassword: string;
 }
 
 const config: Config = {
@@ -56,6 +58,8 @@ const config: Config = {
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
   coinbaseApiKey: process.env.COINBASE_API_KEY || "",
   coinbaseWebhookSecret: process.env.COINBASE_WEBHOOK_SECRET || "",
+  adminLoginEmail: process.env.ADMIN_LOGIN_EMAIL || "admin@ksi-gadgets.local",
+  adminLoginPassword: process.env.ADMIN_LOGIN_PASSWORD || "Admin@1234",
 };
 
 export default config;

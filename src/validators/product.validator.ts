@@ -213,7 +213,7 @@ export const getProductsQueryValidator = [
 
   query("sortBy")
     .optional()
-    .isIn(["price", "rating", "createdAt", "name"])
+    .isIn(["price", "rating", "createdAt", "updatedAt", "name"])
     .withMessage("Invalid sort field"),
 
   query("sortOrder")
