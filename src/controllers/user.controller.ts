@@ -38,9 +38,9 @@ export class UserController {
       return res
         .status(200)
         .json(
-          new ApiResponse(200, updatedUser, "Profile updated successfully")
+          new ApiResponse(200, updatedUser, "Profile updated successfully"),
         );
-    }
+    },
   );
 
   static deleteAccount = asyncHandler(
@@ -56,7 +56,7 @@ export class UserController {
       return res
         .status(200)
         .json(new ApiResponse(200, null, "Account deleted successfully"));
-    }
+    },
   );
 
   // Admin endpoints
@@ -76,7 +76,7 @@ export class UserController {
       return res
         .status(200)
         .json(new ApiResponse(200, result, "Users retrieved successfully"));
-    }
+    },
   );
 
   static getUserById = asyncHandler(
@@ -88,7 +88,7 @@ export class UserController {
       return res
         .status(200)
         .json(new ApiResponse(200, user, "User retrieved successfully"));
-    }
+    },
   );
 
   static deactivateUser = asyncHandler(
@@ -101,7 +101,7 @@ export class UserController {
       return res
         .status(200)
         .json(new ApiResponse(200, null, "User deactivated successfully"));
-    }
+    },
   );
 
   static reactivateUser = asyncHandler(
@@ -113,7 +113,7 @@ export class UserController {
       return res
         .status(200)
         .json(new ApiResponse(200, null, "User reactivated successfully"));
-    }
+    },
   );
 
   static deleteUser = asyncHandler(async (req: IAuthRequest, res: Response) => {

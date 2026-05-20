@@ -163,10 +163,7 @@ export class UserService {
     await this.userRepository.save(user);
   }
 
-  async deleteUserAccount(
-    userId: string,
-    actorUserId?: string,
-  ): Promise<void> {
+  async deleteUserAccount(userId: string, actorUserId?: string): Promise<void> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
     });

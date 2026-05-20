@@ -63,7 +63,8 @@ export const createProductValidator = [
     const hasImages =
       Array.isArray(req.body.images) && req.body.images.length > 0;
     const hasImageUrl =
-      typeof req.body.imageUrl === "string" && req.body.imageUrl.trim().length > 0;
+      typeof req.body.imageUrl === "string" &&
+      req.body.imageUrl.trim().length > 0;
 
     if (hasImages || hasImageUrl) {
       return true;
