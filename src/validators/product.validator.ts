@@ -1,5 +1,29 @@
 import { body, param, query } from "express-validator";
 
+const PRODUCT_CATEGORIES = [
+  "Electronics",
+  "Smartphones",
+  "Laptops",
+  "Tablets",
+  "Accessories",
+  "Audio",
+  "Gaming",
+  "Other",
+] as const;
+
+const PRODUCT_CATEGORY_LOOKUP = Object.fromEntries(
+  PRODUCT_CATEGORIES.map((category) => [category.toLowerCase(), category]),
+);
+
+const normalizeCategory = (value: unknown) => {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return PRODUCT_CATEGORY_LOOKUP[normalized] || value;
+};
+
 export const createProductValidator = [
   body("name")
     .trim()
@@ -22,18 +46,10 @@ export const createProductValidator = [
     .withMessage("Price must be a positive number"),
 
   body("category")
+    .customSanitizer(normalizeCategory)
     .notEmpty()
     .withMessage("Category is required")
-    .isIn([
-      "Electronics",
-      "Smartphones",
-      "Laptops",
-      "Tablets",
-      "Accessories",
-      "Audio",
-      "Gaming",
-      "Other",
-    ])
+    .isIn(PRODUCT_CATEGORIES)
     .withMessage("Invalid category"),
 
   body("brand").optional().trim(),
@@ -101,16 +117,8 @@ export const updateProductValidator = [
 
   body("category")
     .optional()
-    .isIn([
-      "Electronics",
-      "Smartphones",
-      "Laptops",
-      "Tablets",
-      "Accessories",
-      "Audio",
-      "Gaming",
-      "Other",
-    ])
+    .customSanitizer(normalizeCategory)
+    .isIn(PRODUCT_CATEGORIES)
     .withMessage("Invalid category"),
 
   body("stock")
@@ -200,16 +208,8 @@ export const getProductsQueryValidator = [
 
   query("category")
     .optional()
-    .isIn([
-      "Electronics",
-      "Smartphones",
-      "Laptops",
-      "Tablets",
-      "Accessories",
-      "Audio",
-      "Gaming",
-      "Other",
-    ])
+    .customSanitizer(normalizeCategory)
+    .isIn(PRODUCT_CATEGORIES)
     .withMessage("Invalid category"),
 
   query("sortBy")

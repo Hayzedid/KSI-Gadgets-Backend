@@ -35,6 +35,9 @@ export const errorHandler = (
   const response = {
     statusCode: error.statusCode,
     message: error.message,
+    ...(Array.isArray(error.errors) && error.errors.length > 0
+      ? { errors: error.errors }
+      : {}),
     ...(config.env === "development" && { stack: error.stack }),
   };
 
