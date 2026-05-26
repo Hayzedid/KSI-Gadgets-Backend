@@ -20,11 +20,13 @@ export const AppDataSource = new DataSource({
   entities: [User, Product, Review, Cart, CartItem, Order, WishlistItem],
   migrations: ["src/migrations/**/*.ts"],
   subscribers: [],
-  // SSL is required for some hosted Postgres providers (eg. Neon).
+  // Hosted Postgres providers (eg. Neon) need SSL, but local Postgres usually does not.
   // TypeORM passes this through to the `pg` driver.
-  ssl: {
-    rejectUnauthorized: false,
-  },
+  ssl: ["localhost", "127.0.0.1", "::1"].includes(config.dbHost.toLowerCase())
+    ? false
+    : {
+        rejectUnauthorized: false,
+      },
   // Pass driver-specific options via `extra` — include a connection timeout
   extra: {
     connectionTimeoutMillis: 10000,
