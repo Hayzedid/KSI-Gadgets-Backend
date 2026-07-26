@@ -48,6 +48,50 @@ export const createOrderValidator = [
     .trim()
     .isLength({ max: 1000 })
     .withMessage("Notes cannot exceed 1000 characters"),
+
+  body("couponCode")
+    .optional()
+    .trim()
+    .isLength({ max: 50 })
+    .withMessage("Coupon code cannot exceed 50 characters"),
+
+  // Guest checkout fields — only required when the request is unauthenticated;
+  // the controller decides which path to take based on req.user.
+  body("guestEmail")
+    .optional()
+    .trim()
+    .isEmail()
+    .withMessage("A valid guest email is required"),
+
+  body("guestName")
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 100 })
+    .withMessage("Guest name is required"),
+
+  body("items")
+    .optional()
+    .isArray({ min: 1 })
+    .withMessage("At least one item is required for guest checkout"),
+
+  body("items.*.productId")
+    .optional()
+    .isUUID()
+    .withMessage("Invalid product ID in items"),
+
+  body("items.*.quantity")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("Item quantity must be a positive integer"),
+];
+
+export const trackGuestOrderValidator = [
+  query("orderNumber")
+    .trim()
+    .notEmpty()
+    .withMessage("Order number is required"),
+
+  query("email").trim().isEmail().withMessage("A valid email is required"),
 ];
 
 export const orderIdValidator = [

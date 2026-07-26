@@ -11,6 +11,8 @@ import { Product } from "../models/product.model";
 import { User } from "../models/user.model";
 import { ApiError } from "../utils/ApiError";
 import emailService from "./email.service";
+import couponService from "./coupon.service";
+import { EntityManager } from "typeorm";
 
 interface CreateOrderInput {
   shippingAddress: string;
@@ -20,6 +22,18 @@ interface CreateOrderInput {
   shippingCountry: string;
   contactPhone: string;
   notes?: string;
+  couponCode?: string;
+}
+
+interface GuestOrderItemInput {
+  productId: string;
+  quantity: number;
+}
+
+interface GuestCreateOrderInput extends CreateOrderInput {
+  guestEmail: string;
+  guestName: string;
+  items: GuestOrderItemInput[];
 }
 
 export class OrderService {
@@ -35,95 +49,242 @@ export class OrderService {
     return `ORD-${timestamp}-${random}`;
   }
 
-  async createOrder(
-    userId: string,
-    orderData: CreateOrderInput,
-  ): Promise<Order> {
-    // Get user's cart
-    const cart = await this.cartRepository.findOne({
-      where: { userId },
-      relations: ["items", "items.product"],
-    });
-
-    if (!cart || cart.items.length === 0) {
-      throw new ApiError(400, "Cart is empty");
-    }
-
-    // Validate stock availability and prepare order items
+  private async lockAndReserveStock(
+    manager: EntityManager,
+    items: Array<{ productId: string; quantity: number; price: number }>,
+  ): Promise<{ orderItems: OrderItem[]; subtotal: number }> {
     const orderItems: OrderItem[] = [];
     let subtotal = 0;
 
-    for (const cartItem of cart.items) {
-      const product = await this.productRepository.findOne({
-        where: { id: cartItem.productId },
-      });
+    // Lock rows in a stable order to avoid deadlocks between concurrent checkouts.
+    const sortedItems = [...items].sort((a, b) =>
+      a.productId.localeCompare(b.productId),
+    );
+
+    for (const item of sortedItems) {
+      const product = await manager
+        .getRepository(Product)
+        .createQueryBuilder("product")
+        .setLock("pessimistic_write")
+        .where("product.id = :id", { id: item.productId })
+        .getOne();
 
       if (!product) {
-        throw new ApiError(404, `Product ${cartItem.productId} not found`);
+        throw new ApiError(404, `Product ${item.productId} not found`);
       }
 
-      if (product.stock < cartItem.quantity) {
+      if (product.stock < item.quantity) {
         throw new ApiError(400, `Insufficient stock for ${product.name}`);
       }
 
-      const itemSubtotal = Number(cartItem.price) * cartItem.quantity;
+      const itemSubtotal = item.price * item.quantity;
       orderItems.push({
         productId: product.id,
         productName: product.name,
-        quantity: cartItem.quantity,
-        price: Number(cartItem.price),
+        quantity: item.quantity,
+        price: item.price,
         subtotal: itemSubtotal,
       });
 
       subtotal += itemSubtotal;
 
-      // Reduce stock
-      product.stock -= cartItem.quantity;
-      await this.productRepository.save(product);
+      product.stock -= item.quantity;
+      await manager.getRepository(Product).save(product);
     }
 
-    // Calculate totals (you can customize shipping and tax calculation)
-    const shippingCost = subtotal > 100 ? 0 : 10; // Free shipping over $100
-    const tax = subtotal * 0.1; // 10% tax
-    const totalAmount = subtotal + shippingCost + tax;
+    return { orderItems, subtotal };
+  }
 
-    // Create order
-    const order = this.orderRepository.create({
-      userId,
+  private buildEmailPayload(
+    order: Order,
+    customerName: string,
+    orderData: CreateOrderInput,
+  ) {
+    return {
+      orderId: order.orderNumber,
+      customerName,
+      orderDate: order.createdAt.toLocaleDateString(),
+      items: order.items.map((item) => ({
+        name: item.productName,
+        quantity: item.quantity,
+        price: item.price,
+        subtotal: item.subtotal,
+      })),
+      totalAmount: order.totalAmount,
+      shippingAddress: `${orderData.shippingAddress}\n${orderData.shippingCity}, ${orderData.shippingState} ${orderData.shippingZipCode}\n${orderData.shippingCountry}`,
+      paymentMethod: order.paymentMethod || "Pending",
+    };
+  }
+
+  async createOrder(
+    userId: string,
+    orderData: CreateOrderInput,
+  ): Promise<Order> {
+    const savedOrder = await AppDataSource.transaction(async (manager) => {
+      const cart = await manager.getRepository(Cart).findOne({
+        where: { userId },
+        relations: ["items"],
+      });
+
+      if (!cart || cart.items.length === 0) {
+        throw new ApiError(400, "Cart is empty");
+      }
+
+      const { orderItems, subtotal } = await this.lockAndReserveStock(
+        manager,
+        cart.items.map((i) => ({
+          productId: i.productId,
+          quantity: i.quantity,
+          price: Number(i.price),
+        })),
+      );
+
+      const order = await this.finalizeOrder(
+        manager,
+        userId,
+        orderItems,
+        subtotal,
+        orderData,
+      );
+
+      await manager.getRepository(CartItem).delete({ cartId: cart.id });
+      await manager
+        .getRepository(Cart)
+        .update({ id: cart.id }, { totalAmount: 0 });
+
+      return order;
+    });
+
+    await this.sendConfirmationEmail(userId, savedOrder, orderData);
+
+    return savedOrder;
+  }
+
+  async createGuestOrder(orderData: GuestCreateOrderInput): Promise<Order> {
+    if (!orderData.items || orderData.items.length === 0) {
+      throw new ApiError(400, "No items provided for guest order");
+    }
+
+    const savedOrder = await AppDataSource.transaction(async (manager) => {
+      const productIds = orderData.items.map((i) => i.productId);
+      const products = await manager.getRepository(Product).find({
+        where: productIds.map((id) => ({ id })),
+      });
+      const productMap = new Map(products.map((p) => [p.id, p]));
+
+      const itemsWithPrice = orderData.items.map((i) => {
+        const product = productMap.get(i.productId);
+        if (!product) {
+          throw new ApiError(404, `Product ${i.productId} not found`);
+        }
+        return {
+          productId: i.productId,
+          quantity: i.quantity,
+          price: Number(product.price),
+        };
+      });
+
+      const { orderItems, subtotal } = await this.lockAndReserveStock(
+        manager,
+        itemsWithPrice,
+      );
+
+      return this.finalizeOrder(
+        manager,
+        null,
+        orderItems,
+        subtotal,
+        orderData,
+        orderData.guestEmail,
+        orderData.guestName,
+      );
+    });
+
+    try {
+      const emailPayload = this.buildEmailPayload(
+        savedOrder,
+        orderData.guestName,
+        orderData,
+      );
+      await emailService
+        .sendOrderConfirmationEmail(orderData.guestEmail, emailPayload)
+        .catch(() => {});
+    } catch (e) {
+      // swallow email errors
+    }
+
+    return savedOrder;
+  }
+
+  private async finalizeOrder(
+    manager: EntityManager,
+    userId: string | null,
+    orderItems: OrderItem[],
+    subtotal: number,
+    orderData: CreateOrderInput,
+    guestEmail?: string,
+    guestName?: string,
+  ): Promise<Order> {
+    let discountAmount = 0;
+    let couponCode: string | null = null;
+
+    if (orderData.couponCode) {
+      const { coupon, discountAmount: discount } =
+        await couponService.validateCoupon(
+          orderData.couponCode,
+          subtotal,
+          manager,
+        );
+      discountAmount = discount;
+      couponCode = coupon.code;
+      await couponService.incrementUsage(coupon.id, manager);
+    }
+
+    const discountedSubtotal = subtotal - discountAmount;
+    const shippingCost = discountedSubtotal > 100 ? 0 : 10; // Free shipping over $100
+    const tax = discountedSubtotal * 0.1; // 10% tax
+    const totalAmount = discountedSubtotal + shippingCost + tax;
+
+    const orderRepo = manager.getRepository(Order);
+    const order = orderRepo.create({
+      userId: userId ?? undefined,
       orderNumber: this.generateOrderNumber(),
       items: orderItems,
       subtotal,
       shippingCost,
       tax,
+      discountAmount,
+      couponCode,
       totalAmount,
       status: OrderStatus.PENDING,
       paymentStatus: PaymentStatus.PENDING,
-      ...orderData,
-    });
+      shippingAddress: orderData.shippingAddress,
+      shippingCity: orderData.shippingCity,
+      shippingState: orderData.shippingState,
+      shippingZipCode: orderData.shippingZipCode,
+      shippingCountry: orderData.shippingCountry,
+      contactPhone: orderData.contactPhone,
+      notes: orderData.notes,
+      customerEmail: guestEmail,
+      customerName: guestName,
+    } as Partial<Order>);
 
-    const savedOrder = await this.orderRepository.save(order);
+    return orderRepo.save(order);
+  }
 
-    // Clear cart
-    await this.cartItemRepository.delete({ cartId: cart.id });
-    await this.cartRepository.update({ id: cart.id }, { totalAmount: 0 });
-    // Send order confirmation email (fire-and-forget)
+  private async sendConfirmationEmail(
+    userId: string,
+    savedOrder: Order,
+    orderData: CreateOrderInput,
+  ): Promise<void> {
     try {
       const user = await this.userRepository.findOne({ where: { id: userId } });
       if (user) {
-        const orderEmailData = {
-          orderId: savedOrder.orderNumber,
-          customerName: user.name,
-          orderDate: savedOrder.createdAt.toLocaleDateString(),
-          items: orderItems.map((item) => ({
-            name: item.productName,
-            quantity: item.quantity,
-            price: item.price,
-            subtotal: item.subtotal,
-          })),
-          totalAmount: savedOrder.totalAmount,
-          shippingAddress: `${orderData.shippingAddress}\n${orderData.shippingCity}, ${orderData.shippingState} ${orderData.shippingZipCode}\n${orderData.shippingCountry}`,
-          paymentMethod: savedOrder.paymentMethod || "Pending",
-        };
+        const orderEmailData = this.buildEmailPayload(
+          savedOrder,
+          user.name,
+          orderData,
+        );
 
         await emailService
           .sendOrderConfirmationEmail(user.email, orderEmailData)
@@ -132,8 +293,6 @@ export class OrderService {
     } catch (e) {
       // swallow email errors
     }
-
-    return savedOrder;
   }
 
   async getOrderById(orderId: string, userId?: string): Promise<Order> {
@@ -148,6 +307,21 @@ export class OrderService {
     });
 
     if (!order) {
+      throw new ApiError(404, "Order not found");
+    }
+
+    return order;
+  }
+
+  async trackGuestOrder(orderNumber: string, email: string): Promise<Order> {
+    const order = await this.orderRepository.findOne({
+      where: { orderNumber: orderNumber.trim() },
+    });
+
+    if (
+      !order ||
+      (order.customerEmail || "").toLowerCase() !== email.trim().toLowerCase()
+    ) {
       throw new ApiError(404, "Order not found");
     }
 
@@ -241,14 +415,17 @@ export class OrderService {
 
     // Send order status update email (fire-and-forget)
     try {
-      const user = await this.userRepository.findOne({
-        where: { id: order.userId },
-      });
-      if (user) {
+      const user = order.userId
+        ? await this.userRepository.findOne({ where: { id: order.userId } })
+        : null;
+      const recipientEmail = user?.email || order.customerEmail;
+      const recipientName = user?.name || order.customerName || "Customer";
+
+      if (recipientEmail) {
         await emailService
           .sendOrderStatusUpdateEmail(
-            user.email,
-            user.name,
+            recipientEmail,
+            recipientName,
             order.orderNumber,
             status,
           )
@@ -279,32 +456,48 @@ export class OrderService {
       throw new ApiError(400, "Cannot cancel shipped or delivered order");
     }
 
-    // Restore product stock
-    for (const item of order.items) {
-      const product = await this.productRepository.findOne({
-        where: { id: item.productId },
-      });
+    const cancelledOrder = await AppDataSource.transaction(async (manager) => {
+      // Restore product stock, locking rows to stay consistent with checkout locking
+      const sortedItems = [...order.items].sort((a, b) =>
+        a.productId.localeCompare(b.productId),
+      );
 
-      if (product) {
-        product.stock += item.quantity;
-        await this.productRepository.save(product);
+      for (const item of sortedItems) {
+        const product = await manager
+          .getRepository(Product)
+          .createQueryBuilder("product")
+          .setLock("pessimistic_write")
+          .where("product.id = :id", { id: item.productId })
+          .getOne();
+
+        if (product) {
+          product.stock += item.quantity;
+          await manager.getRepository(Product).save(product);
+        }
       }
-    }
 
-    order.status = OrderStatus.CANCELLED;
-    order.cancelledAt = new Date();
-    order.cancellationReason = reason;
+      order.status = OrderStatus.CANCELLED;
+      order.cancelledAt = new Date();
+      order.cancellationReason = reason;
 
-    const cancelledOrder = await this.orderRepository.save(order);
+      return manager.getRepository(Order).save(order);
+    });
 
     // Send order cancellation email (fire-and-forget)
     try {
-      const user = await this.userRepository.findOne({
-        where: { id: order.userId },
-      });
-      if (user) {
+      const user = order.userId
+        ? await this.userRepository.findOne({ where: { id: order.userId } })
+        : null;
+      const recipientEmail = user?.email || order.customerEmail;
+      const recipientName = user?.name || order.customerName || "Customer";
+
+      if (recipientEmail) {
         await emailService
-          .sendOrderCancellationEmail(user.email, user.name, order.orderNumber)
+          .sendOrderCancellationEmail(
+            recipientEmail,
+            recipientName,
+            order.orderNumber,
+          )
           .catch(() => {});
       }
     } catch (e) {
@@ -383,6 +576,63 @@ export class OrderService {
       delivered,
       cancelled,
       totalRevenue: totalRevenue?.total || 0,
+    };
+  }
+
+  async getSalesAnalytics(days = 30) {
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+    const revenueByDay = await this.orderRepository
+      .createQueryBuilder("order")
+      .select("DATE(order.createdAt)", "date")
+      .addSelect("SUM(order.totalAmount)", "revenue")
+      .addSelect("COUNT(*)", "orders")
+      .where("order.createdAt >= :since", { since })
+      .andWhere("order.status != :cancelled", {
+        cancelled: OrderStatus.CANCELLED,
+      })
+      .groupBy("DATE(order.createdAt)")
+      .orderBy("DATE(order.createdAt)", "ASC")
+      .getRawMany();
+
+    const orders = await this.orderRepository
+      .createQueryBuilder("order")
+      .where("order.createdAt >= :since", { since })
+      .andWhere("order.status != :cancelled", {
+        cancelled: OrderStatus.CANCELLED,
+      })
+      .getMany();
+
+    const productTotals = new Map<
+      string,
+      { productName: string; quantity: number; revenue: number }
+    >();
+
+    for (const order of orders) {
+      for (const item of order.items) {
+        const existing = productTotals.get(item.productId) || {
+          productName: item.productName,
+          quantity: 0,
+          revenue: 0,
+        };
+        existing.quantity += item.quantity;
+        existing.revenue += item.subtotal;
+        productTotals.set(item.productId, existing);
+      }
+    }
+
+    const topProducts = [...productTotals.entries()]
+      .map(([productId, data]) => ({ productId, ...data }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 10);
+
+    return {
+      revenueByDay: revenueByDay.map((row) => ({
+        date: row.date,
+        revenue: Number(row.revenue) || 0,
+        orders: Number(row.orders) || 0,
+      })),
+      topProducts,
     };
   }
 }

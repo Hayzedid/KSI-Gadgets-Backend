@@ -1,36 +1,54 @@
 import { Response } from "express";
 import { IAuthRequest } from "../middlewares/auth.middleware";
 import { OrderService } from "../services/order.service";
+import invoiceService from "../services/invoice.service";
 import { asyncHandler } from "../utils/asyncHandler";
 import { ApiResponse } from "../utils/ApiResponse";
+import { ApiError } from "../utils/ApiError";
 import { OrderStatus, PaymentStatus } from "../models/order.model";
-import emailService from "../utils/email.service";
 
 const orderService = new OrderService();
 
 export const createOrder = asyncHandler(
   async (req: IAuthRequest, res: Response) => {
     const userId = req.user?.id;
-    if (!userId) {
-      throw new Error("User ID not found");
+
+    if (userId) {
+      const order = await orderService.createOrder(userId, req.body);
+      res
+        .status(201)
+        .json(new ApiResponse(201, order, "Order created successfully"));
+      return;
     }
 
-    const orderData = req.body;
+    // No authenticated user — treat as a guest checkout.
+    const { guestEmail, guestName, items } = req.body;
+    if (!guestEmail || !guestName || !Array.isArray(items)) {
+      throw new ApiError(
+        400,
+        "guestEmail, guestName, and items are required for guest checkout",
+      );
+    }
 
-    const order = await orderService.createOrder(userId, orderData);
-
-    // Send order confirmation email if email available
-    try {
-      const userEmail = req.user?.email;
-      if (userEmail) {
-        const detailsHtml = `<p>Items: ${JSON.stringify(order.items || [])}</p><p>Total: ${order.totalAmount}</p>`;
-        emailService.sendOrderConfirmation(userEmail, order.id, detailsHtml).catch(() => {});
-      }
-    } catch (e) {}
-
+    const order = await orderService.createGuestOrder(req.body);
     res
       .status(201)
       .json(new ApiResponse(201, order, "Order created successfully"));
+  }
+);
+
+export const trackGuestOrder = asyncHandler(
+  async (req: IAuthRequest, res: Response) => {
+    const { orderNumber, email } = req.query as {
+      orderNumber: string;
+      email: string;
+    };
+
+    const order = await orderService.trackGuestOrder(orderNumber, email);
+
+    res
+      .status(200)
+      .json(new ApiResponse(200, order, "Order retrieved successfully"));
   }
 );
 
@@ -62,6 +80,25 @@ export const getOrderById = asyncHandler(
     res
       .status(200)
       .json(new ApiResponse(200, order, "Order retrieved successfully"));
+  }
+);
+
+export const downloadInvoice = asyncHandler(
+  async (req: IAuthRequest, res: Response) => {
+    const userId = req.user?.id;
+    const { id } = req.params;
+
+    const order = await orderService.getOrderById(id, userId);
+    const customerName = order.user?.name || order.customerName || "Customer";
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="invoice-${order.orderNumber}.pdf"`,
+    );
+
+    const doc = invoiceService.generateInvoicePdf(order, customerName);
+    doc.pipe(res);
   }
 );
 
@@ -133,6 +170,19 @@ export const updatePaymentStatus = asyncHandler(
     res
       .status(200)
       .json(new ApiResponse(200, order, "Payment status updated successfully"));
+  }
+);
+
+export const getSalesAnalytics = asyncHandler(
+  async (req: IAuthRequest, res: Response) => {
+    const days = req.query.days ? parseInt(req.query.days as string) : 30;
+    const analytics = await orderService.getSalesAnalytics(days);
+
+    res
+      .status(200)
+      .json(
+        new ApiResponse(200, analytics, "Sales analytics retrieved successfully"),
+      );
   }
 );
 

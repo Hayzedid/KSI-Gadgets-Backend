@@ -24,6 +24,9 @@ export class Cart {
   @Column({ type: "decimal", precision: 10, scale: 2, default: 0 })
   totalAmount: number;
 
+  @Column({ type: "timestamp", nullable: true })
+  abandonedEmailSentAt: Date | null;
+
   @OneToOne(() => User, { onDelete: "CASCADE" })
   @JoinColumn({ name: "userId" })
   user: User;

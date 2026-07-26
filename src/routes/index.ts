@@ -8,6 +8,8 @@ import paymentRoutes from "./payment.routes";
 import cryptoPaymentRoutes from "./crypto-payment.routes";
 import wishlistRoutes from "./wishlist.routes";
 import supportRoutes from "./support.routes";
+import couponRoutes from "./coupon.routes";
+import addressRoutes from "./address.routes";
 
 const router = Router();
 
@@ -21,5 +23,7 @@ router.use("/payments", paymentRoutes);
 router.use("/crypto-payments", cryptoPaymentRoutes);
 router.use("/wishlist", wishlistRoutes);
 router.use("/support", supportRoutes);
+router.use("/coupons", couponRoutes);
+router.use("/addresses", addressRoutes);
 
 export default router;

@@ -1,7 +1,9 @@
 import { Response } from "express";
 import { IAuthRequest } from "../middlewares/auth.middleware";
 import { authService } from "../services/auth.service";
+import twoFactorService from "../services/twoFactor.service";
 import { ApiResponse } from "../utils/ApiResponse";
+import { ApiError } from "../utils/ApiError";
 import { asyncHandler } from "../utils/asyncHandler" ;
 
 export class AuthController {
@@ -28,6 +30,16 @@ export class AuthController {
       password,
     });
 
+    if ("twoFactorRequired" in result) {
+      return res.status(200).json(
+        new ApiResponse(
+          200,
+          { twoFactorRequired: true, userId: result.userId },
+          "Two-factor authentication code required"
+        )
+      );
+    }
+
     // Set refresh token as httpOnly cookie (optional)
     res.cookie("refreshToken", result.refreshToken, {
       httpOnly: true,
@@ -48,6 +60,74 @@ export class AuthController {
       )
     );
   });
+
+  static verifyTwoFactorLogin = asyncHandler(
+    async (req: IAuthRequest, res: Response) => {
+      const { userId, token } = req.body;
+
+      const result = await authService.verifyTwoFactorLogin(userId, token);
+
+      res.cookie("refreshToken", result.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+
+      return res.status(200).json(
+        new ApiResponse(
+          200,
+          {
+            user: result.user,
+            accessToken: result.accessToken,
+            refreshToken: result.refreshToken,
+          },
+          "Login successful"
+        )
+      );
+    }
+  );
+
+  static setupTwoFactor = asyncHandler(
+    async (req: IAuthRequest, res: Response) => {
+      const userId = req.user?.id;
+      if (!userId) throw new ApiError(401, "Unauthorized");
+
+      const setup = await twoFactorService.generateSetup(userId);
+
+      return res
+        .status(200)
+        .json(new ApiResponse(200, setup, "Scan the QR code with your authenticator app"));
+    }
+  );
+
+  static enableTwoFactor = asyncHandler(
+    async (req: IAuthRequest, res: Response) => {
+      const userId = req.user?.id;
+      if (!userId) throw new ApiError(401, "Unauthorized");
+
+      const { token } = req.body;
+      await twoFactorService.enableTwoFactor(userId, token);
+
+      return res
+        .status(200)
+        .json(new ApiResponse(200, null, "Two-factor authentication enabled"));
+    }
+  );
+
+  static disableTwoFactor = asyncHandler(
+    async (req: IAuthRequest, res: Response) => {
+      const userId = req.user?.id;
+      if (!userId) throw new ApiError(401, "Unauthorized");
+
+      const { token } = req.body;
+      await twoFactorService.disableTwoFactor(userId, token);
+
+      return res
+        .status(200)
+        .json(new ApiResponse(200, null, "Two-factor authentication disabled"));
+    }
+  );
 
   static refreshToken = asyncHandler(
     async (req: IAuthRequest, res: Response) => {

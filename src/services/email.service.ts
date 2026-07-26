@@ -283,6 +283,41 @@ class EmailService {
     await this.sendMail({ to, subject, html, text });
   }
 
+  /**
+   * Notify a customer that a product they asked about is back in stock
+   */
+  async sendBackInStockEmail(
+    to: string,
+    productName: string,
+    productId: string,
+  ): Promise<void> {
+    const productUrl = `${config.clientUrl.split(",")[0]}/product/${productId}`;
+    const subject = `${productName} is back in stock! - KSI Gadgets`;
+    const html = this.getBackInStockEmailTemplate(productName, productUrl);
+    const text = `Good news!\n\n${productName} is back in stock.\n\nGet it before it sells out again: ${productUrl}\n\nBest regards,\nThe KSI Gadgets Team`;
+
+    await this.sendMail({ to, subject, html, text });
+  }
+
+  /**
+   * Reminder email for a cart left inactive for a while
+   */
+  async sendAbandonedCartEmail(
+    to: string,
+    name: string,
+    items: Array<{ name: string; quantity: number; price: number }>,
+  ): Promise<void> {
+    const cartUrl = `${config.clientUrl.split(",")[0]}/cart`;
+    const subject = "You left something in your cart - KSI Gadgets";
+    const html = this.getAbandonedCartEmailTemplate(name, items, cartUrl);
+    const itemLines = items
+      .map((i) => `- ${i.name} x${i.quantity} ($${i.price.toFixed(2)})`)
+      .join("\n");
+    const text = `Hi ${name},\n\nYou left these items in your cart:\n\n${itemLines}\n\nComplete your purchase: ${cartUrl}\n\nBest regards,\nThe KSI Gadgets Team`;
+
+    await this.sendMail({ to, subject, html, text });
+  }
+
   // ================== EMAIL TEMPLATES ==================
 
   private getEmailLayout(content: string): string {
@@ -594,6 +629,54 @@ class EmailService {
       </div>
       <div style="text-align: center;">
         <a href="${config.clientUrl}/profile" class="button">View Account Settings</a>
+      </div>
+      <p><strong>The KSI Gadgets Team</strong></p>
+    `;
+    return this.getEmailLayout(content);
+  }
+
+  private getBackInStockEmailTemplate(
+    productName: string,
+    productUrl: string,
+  ): string {
+    const content = `
+      <h2>Good News — It's Back! 🎉</h2>
+      <p><strong>${productName}</strong> is back in stock and ready to ship.</p>
+      <p>Popular items sell out fast, so grab yours before it's gone again.</p>
+      <div style="text-align: center;">
+        <a href="${productUrl}" class="button">Shop Now</a>
+      </div>
+      <p><strong>The KSI Gadgets Team</strong></p>
+    `;
+    return this.getEmailLayout(content);
+  }
+
+  private getAbandonedCartEmailTemplate(
+    name: string,
+    items: Array<{ name: string; quantity: number; price: number }>,
+    cartUrl: string,
+  ): string {
+    const itemsHtml = items
+      .map(
+        (item) => `
+        <tr>
+          <td style="padding: 8px 0;">${item.name}</td>
+          <td style="padding: 8px 0; text-align: center;">${item.quantity}</td>
+          <td style="padding: 8px 0; text-align: right;">$${item.price.toFixed(2)}</td>
+        </tr>
+      `,
+      )
+      .join("");
+
+    const content = `
+      <h2>You left something behind</h2>
+      <p>Hi ${name},</p>
+      <p>You still have items waiting in your cart. Complete your order before they sell out.</p>
+      <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+        ${itemsHtml}
+      </table>
+      <div style="text-align: center;">
+        <a href="${cartUrl}" class="button">Complete Your Purchase</a>
       </div>
       <p><strong>The KSI Gadgets Team</strong></p>
     `;

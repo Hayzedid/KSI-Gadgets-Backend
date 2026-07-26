@@ -7,6 +7,9 @@ import { Cart } from "../models/cart.model";
 import { CartItem } from "../models/cart-item.model";
 import { Order } from "../models/order.model";
 import { WishlistItem } from "../models/wishlist-item.model";
+import { Address } from "../models/address.model";
+import { Coupon } from "../models/coupon.model";
+import { StockNotification } from "../models/stock-notification.model";
 
 export const AppDataSource = new DataSource({
   type: "postgres",
@@ -15,9 +18,22 @@ export const AppDataSource = new DataSource({
   username: config.dbUser,
   password: config.dbPassword,
   database: config.dbName,
-  synchronize: config.env === "development", // Auto-create tables in development
+  // Schema changes are managed via migrations (see `npm run migration:*`).
+  // Auto-sync is disabled everywhere so dev and prod always share one source of truth.
+  synchronize: false,
   logging: false, // Disable query logging
-  entities: [User, Product, Review, Cart, CartItem, Order, WishlistItem],
+  entities: [
+    User,
+    Product,
+    Review,
+    Cart,
+    CartItem,
+    Order,
+    WishlistItem,
+    Address,
+    Coupon,
+    StockNotification,
+  ],
   migrations: ["src/migrations/**/*.ts"],
   subscribers: [],
   // Hosted Postgres providers (eg. Neon) need SSL, but local Postgres usually does not.
@@ -36,6 +52,7 @@ export const AppDataSource = new DataSource({
 export const connectDatabase = async (): Promise<void> => {
   try {
     await AppDataSource.initialize();
+    await AppDataSource.runMigrations();
     console.log("✅ PostgreSQL database connected successfully");
   } catch (error) {
     console.error("❌ Error connecting to PostgreSQL database:");

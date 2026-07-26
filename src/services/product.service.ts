@@ -2,8 +2,10 @@ import { AppDataSource } from "../config/database";
 import { Product, ProductCategory } from "../models/product.model";
 import { Review } from "../models/review.model";
 import { CartItem } from "../models/cart-item.model";
+import { Order } from "../models/order.model";
 import { ApiError } from "../utils/ApiError";
 import { ILike, Between, FindOptionsWhere } from "typeorm";
+import stockNotificationService from "./stock-notification.service";
 
 interface IProductFilter {
   category?: ProductCategory;
@@ -24,6 +26,7 @@ export class ProductService {
   private productRepository = AppDataSource.getRepository(Product);
   private reviewRepository = AppDataSource.getRepository(Review);
   private cartItemRepository = AppDataSource.getRepository(CartItem);
+  private orderRepository = AppDataSource.getRepository(Order);
 
   async getAllProducts(
     filters: IProductFilter,
@@ -95,9 +98,24 @@ export class ProductService {
     updateData: Partial<Product>,
   ): Promise<Product> {
     const product = await this.getProductById(productId);
+    const wasOutOfStock = product.stock <= 0;
 
     Object.assign(product, updateData);
-    return await this.productRepository.save(product);
+    const updated = await this.productRepository.save(product);
+
+    if (wasOutOfStock && updated.stock > 0) {
+      stockNotificationService.notifyIfBackInStock(productId).catch(() => {});
+    }
+
+    return updated;
+  }
+
+  async getLowStockProducts(): Promise<Product[]> {
+    return this.productRepository
+      .createQueryBuilder("product")
+      .where('product.stock <= product."lowStockThreshold"')
+      .orderBy("product.stock", "ASC")
+      .getMany();
   }
 
   async deleteProduct(productId: string): Promise<void> {
@@ -109,16 +127,45 @@ export class ProductService {
     await this.productRepository.remove(product);
   }
 
-  async getProductReviews(productId: string) {
+  async getProductReviews(
+    productId: string,
+    sortBy: "recent" | "rating" | "helpful" = "recent",
+  ) {
     await this.getProductById(productId); // Check if product exists
+
+    const order: Record<string, "ASC" | "DESC"> =
+      sortBy === "rating" ? { rating: "DESC" } : { createdAt: "DESC" };
 
     const reviews = await this.reviewRepository.find({
       where: { productId },
       relations: ["user"],
-      order: { createdAt: "DESC" },
+      order,
     });
 
-    return reviews;
+    if (reviews.length === 0) {
+      return reviews;
+    }
+
+    // A review counts as a verified purchase if the reviewer has a
+    // non-cancelled order that includes this product.
+    const userIds = [...new Set(reviews.map((r) => r.userId))];
+    const orders = await this.orderRepository
+      .createQueryBuilder("order")
+      .where("order.userId IN (:...userIds)", { userIds })
+      .andWhere("order.status != :cancelled", { cancelled: "cancelled" })
+      .getMany();
+
+    const purchasedByUser = new Set<string>();
+    for (const o of orders) {
+      if (o.items.some((item) => item.productId === productId) && o.userId) {
+        purchasedByUser.add(o.userId);
+      }
+    }
+
+    return reviews.map((review) => ({
+      ...review,
+      verifiedPurchase: purchasedByUser.has(review.userId),
+    }));
   }
 
   async addProductReview(

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import AuthController from "../controllers/auth.controller";
 import { authenticate } from "../middlewares/auth.middleware";
+import { authRateLimiter } from "../middlewares/rateLimit.middleware";
 import {
   registerValidator,
   loginValidator,
@@ -9,6 +10,8 @@ import {
   requestPasswordResetValidator,
   resetPasswordValidator,
   verifyResetTokenValidator,
+  verifyTwoFactorLoginValidator,
+  twoFactorTokenValidator,
 } from "../validators/auth.validator";
 import { validate } from "../middlewares/validation.middleware";
 
@@ -45,7 +48,13 @@ const router = Router();
  *       400:
  *         description: Invalid input
  */
-router.post("/register", registerValidator, validate, AuthController.register);
+router.post(
+  "/register",
+  authRateLimiter,
+  registerValidator,
+  validate,
+  AuthController.register
+);
 
 /**
  * @swagger
@@ -73,7 +82,99 @@ router.post("/register", registerValidator, validate, AuthController.register);
  *       401:
  *         description: Invalid credentials
  */
-router.post("/login", loginValidator, validate, AuthController.login);
+router.post(
+  "/login",
+  authRateLimiter,
+  loginValidator,
+  validate,
+  AuthController.login
+);
+
+/**
+ * @swagger
+ * /api/auth/verify-2fa:
+ *   post:
+ *     summary: Complete login with a two-factor authentication code
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userId
+ *               - token
+ *             properties:
+ *               userId:
+ *                 type: string
+ *               token:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Login successful
+ */
+router.post(
+  "/verify-2fa",
+  authRateLimiter,
+  verifyTwoFactorLoginValidator,
+  validate,
+  AuthController.verifyTwoFactorLogin
+);
+
+/**
+ * @swagger
+ * /api/auth/2fa/setup:
+ *   post:
+ *     summary: Generate a new 2FA secret and QR code for the current user
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 2FA setup data
+ */
+router.post("/2fa/setup", authenticate, AuthController.setupTwoFactor);
+
+/**
+ * @swagger
+ * /api/auth/2fa/enable:
+ *   post:
+ *     summary: Confirm setup and enable 2FA
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 2FA enabled
+ */
+router.post(
+  "/2fa/enable",
+  authenticate,
+  twoFactorTokenValidator,
+  validate,
+  AuthController.enableTwoFactor
+);
+
+/**
+ * @swagger
+ * /api/auth/2fa/disable:
+ *   post:
+ *     summary: Disable 2FA
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 2FA disabled
+ */
+router.post(
+  "/2fa/disable",
+  authenticate,
+  twoFactorTokenValidator,
+  validate,
+  AuthController.disableTwoFactor
+);
 
 /**
  * @swagger
@@ -126,6 +227,7 @@ router.post(
  */
 router.post(
   "/request-password-reset",
+  authRateLimiter,
   requestPasswordResetValidator,
   validate,
   AuthController.requestPasswordReset

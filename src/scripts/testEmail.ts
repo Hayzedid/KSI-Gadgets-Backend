@@ -14,7 +14,7 @@ async function testEmail() {
   try {
     const result = await resend.emails.send({
       from: `KSI Gadgets <${process.env.EMAIL_FROM}>`,
-      to: ["iazeez775@gmail.com"],
+      to: [process.env.TEST_EMAIL_TO || process.env.EMAIL_FROM || ""],
       subject: "KSI Gadgets - Email Test",
       html: `
         <div style="font-family: sans-serif; max-width: 500px; margin: auto; padding: 20px;">

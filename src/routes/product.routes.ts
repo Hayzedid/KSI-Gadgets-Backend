@@ -43,6 +43,25 @@ router.get(
 
 /**
  * @swagger
+ * /api/products/low-stock:
+ *   get:
+ *     summary: Get products at or below their low-stock threshold (Admin only)
+ *     tags: [Products]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of low-stock products
+ */
+router.get(
+  "/low-stock",
+  authenticate,
+  authorize(UserRole.ADMIN),
+  productController.getLowStockProducts,
+);
+
+/**
+ * @swagger
  * /api/products/{id}:
  *   get:
  *     summary: Get product by ID
@@ -124,6 +143,40 @@ router.post(
   productValidator.addReviewValidator,
   validate,
   productController.addProductReview
+);
+
+/**
+ * @swagger
+ * /api/products/{id}/notify-stock:
+ *   post:
+ *     summary: Subscribe an email to be notified when a product is back in stock
+ *     tags: [Products]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Subscribed successfully
+ */
+router.post(
+  "/:id/notify-stock",
+  productValidator.notifyStockValidator,
+  validate,
+  productController.subscribeToStockNotification,
 );
 
 /**

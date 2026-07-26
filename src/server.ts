@@ -3,11 +3,15 @@ import app from "./app";
 import config from "./config/env";
 import { connectDatabase } from "./config/database";
 import logger from "./config/logger";
+import { scheduleAbandonedCartJob } from "./jobs/abandonedCart.job";
 
 const startServer = async () => {
   try {
     // Connect to database
     await connectDatabase();
+
+    // Background jobs
+    scheduleAbandonedCartJob();
 
     // Start server
     const server = app.listen(config.port, () => {

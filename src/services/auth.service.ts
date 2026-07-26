@@ -5,6 +5,7 @@ import { JwtService, ITokenPayload } from "../utils/jwt";
 import { ApiError } from "../utils/ApiError";
 import config from "../config/env";
 import emailService from "../services/email.service";
+import twoFactorService from "../services/twoFactor.service";
 import crypto from "crypto";
 
 export interface IRegisterDTO {
@@ -29,6 +30,11 @@ export interface IAuthResponse {
   };
   accessToken: string;
   refreshToken: string;
+}
+
+export interface ITwoFactorRequiredResponse {
+  twoFactorRequired: true;
+  userId: string;
 }
 
 export class AuthService {
@@ -127,7 +133,9 @@ export class AuthService {
     };
   }
 
-  async login(dto: ILoginDTO): Promise<IAuthResponse> {
+  async login(
+    dto: ILoginDTO,
+  ): Promise<IAuthResponse | ITwoFactorRequiredResponse> {
     const normalizedEmail = dto.email.trim().toLowerCase();
     const adminEmail = config.adminLoginEmail.trim().toLowerCase();
 
@@ -192,7 +200,49 @@ export class AuthService {
       ]);
     }
 
+    if (user.twoFactorEnabled) {
+      return { twoFactorRequired: true, userId: user.id };
+    }
+
     // Generate tokens
+    const tokenPayload: ITokenPayload = {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    };
+
+    const { accessToken, refreshToken } =
+      JwtService.generateTokenPair(tokenPayload);
+
+    return {
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        phone: user.phone,
+      },
+      accessToken,
+      refreshToken,
+    };
+  }
+
+  async verifyTwoFactorLogin(
+    userId: string,
+    token: string,
+  ): Promise<IAuthResponse> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+
+    if (!user || !user.twoFactorEnabled) {
+      throw new ApiError(400, "Two-factor authentication is not enabled");
+    }
+
+    if (!twoFactorService.verifyCode(user, token)) {
+      throw new ApiError(401, "Invalid two-factor code");
+    }
+
+    await twoFactorService.consumeBackupCodeIfUsed(user, token);
+
     const tokenPayload: ITokenPayload = {
       id: user.id,
       email: user.email,

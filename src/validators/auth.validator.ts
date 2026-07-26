@@ -111,3 +111,18 @@ export const resetPasswordValidator = [
 export const verifyResetTokenValidator = [
   body("token").notEmpty().withMessage("Reset token is required"),
 ];
+
+export const verifyTwoFactorLoginValidator = [
+  body("userId").isUUID().withMessage("Invalid user ID"),
+  body("token")
+    .trim()
+    .notEmpty()
+    .withMessage("Two-factor code is required"),
+];
+
+export const twoFactorTokenValidator = [
+  body("token")
+    .trim()
+    .notEmpty()
+    .withMessage("Two-factor code is required"),
+];

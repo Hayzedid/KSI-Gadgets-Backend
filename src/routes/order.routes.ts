@@ -2,12 +2,66 @@ import { Router } from "express";
 import * as orderController from "../controllers/order.controller";
 import * as orderValidator from "../validators/order.validator";
 import { validate } from "../middlewares/validation.middleware";
-import { authenticate, authorize } from "../middlewares/auth.middleware";
+import {
+  authenticate,
+  authorize,
+  optionalAuth,
+} from "../middlewares/auth.middleware";
+import { authRateLimiter } from "../middlewares/rateLimit.middleware";
 import { UserRole } from "../models/user.model";
 
 const router = Router();
 
-// All order routes require authentication
+/**
+ * @swagger
+ * /api/orders/track:
+ *   get:
+ *     summary: Track a guest order by order number and email
+ *     tags: [Orders]
+ *     parameters:
+ *       - in: query
+ *         name: orderNumber
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: email
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Order details
+ */
+router.get(
+  "/track",
+  authRateLimiter,
+  orderValidator.trackGuestOrderValidator,
+  validate,
+  orderController.trackGuestOrder,
+);
+
+/**
+ * @swagger
+ * /api/orders:
+ *   post:
+ *     summary: Create new order (authenticated or guest checkout)
+ *     tags: [Orders]
+ *     requestBody:
+ *       required: true
+ *     responses:
+ *       201:
+ *         description: Order created
+ */
+router.post(
+  "/",
+  optionalAuth,
+  orderValidator.createOrderValidator,
+  validate,
+  orderController.createOrder,
+);
+
+// Everything below requires authentication
 router.use(authenticate);
 
 /**
@@ -42,39 +96,6 @@ router.get(
  *         description: Order statistics
  */
 router.get("/my-stats", orderController.getUserOrderStats);
-
-/**
- * @swagger
- * /api/orders:
- *   post:
- *     summary: Create new order
- *     tags: [Orders]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - shippingAddress
- *               - paymentMethod
- *             properties:
- *               shippingAddress:
- *                 type: object
- *               paymentMethod:
- *                 type: string
- *     responses:
- *       201:
- *         description: Order created
- */
-router.post(
-  "/",
-  orderValidator.createOrderValidator,
-  validate,
-  orderController.createOrder,
-);
 
 /**
  * @swagger
@@ -134,6 +155,29 @@ router.get(
  *         description: Order statistics
  */
 router.get("/stats", authorize(UserRole.ADMIN), orderController.getOrderStats);
+
+/**
+ * @swagger
+ * /api/orders/analytics:
+ *   get:
+ *     summary: Get sales analytics — revenue over time and top products (Admin)
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: days
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Sales analytics
+ */
+router.get(
+  "/analytics",
+  authorize(UserRole.ADMIN),
+  orderController.getSalesAnalytics,
+);
 
 /**
  * @swagger
@@ -207,6 +251,31 @@ router.put(
   orderValidator.updatePaymentStatusValidator,
   validate,
   orderController.updatePaymentStatus,
+);
+
+/**
+ * @swagger
+ * /api/orders/{id}/invoice:
+ *   get:
+ *     summary: Download a PDF invoice for an order
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: PDF invoice
+ */
+router.get(
+  "/:id/invoice",
+  orderValidator.orderIdValidator,
+  validate,
+  orderController.downloadInvoice,
 );
 
 /**

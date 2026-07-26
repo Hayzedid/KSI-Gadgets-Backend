@@ -1,6 +1,7 @@
 import { Response } from "express";
 import { IAuthRequest } from "../middlewares/auth.middleware";
 import { ProductService } from "../services/product.service";
+import stockNotificationService from "../services/stock-notification.service";
 import { asyncHandler } from "../utils/asyncHandler";
 import { ApiResponse } from "../utils/ApiResponse";
 import { ProductCategory } from "../models/product.model";
@@ -110,11 +111,46 @@ export const deleteProduct = asyncHandler(
 
 export const getProductReviews = asyncHandler(
   async (req: IAuthRequest, res: Response) => {
-    const reviews = await productService.getProductReviews(req.params.id);
+    const sortBy =
+      (req.query.sortBy as "recent" | "rating" | "helpful") || "recent";
+
+    const reviews = await productService.getProductReviews(
+      req.params.id,
+      sortBy,
+    );
 
     res
       .status(200)
       .json(new ApiResponse(200, reviews, "Reviews retrieved successfully"));
+  },
+);
+
+export const getLowStockProducts = asyncHandler(
+  async (_req: IAuthRequest, res: Response) => {
+    const products = await productService.getLowStockProducts();
+
+    res
+      .status(200)
+      .json(
+        new ApiResponse(200, products, "Low stock products retrieved successfully"),
+      );
+  },
+);
+
+export const subscribeToStockNotification = asyncHandler(
+  async (req: IAuthRequest, res: Response) => {
+    const { email } = req.body;
+    await stockNotificationService.subscribe(req.params.id, email);
+
+    res
+      .status(201)
+      .json(
+        new ApiResponse(
+          201,
+          null,
+          "You'll be notified when this product is back in stock",
+        ),
+      );
   },
 );
 

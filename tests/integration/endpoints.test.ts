@@ -23,13 +23,6 @@ jest.mock("../../src/services/email.service", () => ({
   },
 }));
 
-jest.mock("../../src/utils/email.service", () => ({
-  __esModule: true,
-  default: {
-    sendOrderConfirmation: jest.fn().mockResolvedValue(undefined),
-  },
-}));
-
 const api = request(app);
 
 const makeEmail = (prefix: string): string =>

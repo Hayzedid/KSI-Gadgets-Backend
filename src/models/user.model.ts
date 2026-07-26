@@ -43,6 +43,15 @@ export class User {
   @Column({ type: "timestamp", nullable: true })
   passwordResetExpires?: Date;
 
+  @Column({ type: "boolean", default: false })
+  twoFactorEnabled: boolean;
+
+  @Column({ type: "varchar", nullable: true })
+  twoFactorSecret?: string;
+
+  @Column({ type: "simple-array", nullable: true })
+  twoFactorBackupCodes?: string[];
+
   @CreateDateColumn()
   createdAt: Date;
 

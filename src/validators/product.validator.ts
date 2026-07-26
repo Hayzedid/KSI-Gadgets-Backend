@@ -185,6 +185,11 @@ export const reviewIdValidator = [
   param("reviewId").isUUID().withMessage("Invalid review ID"),
 ];
 
+export const notifyStockValidator = [
+  param("id").isUUID().withMessage("Invalid product ID"),
+  body("email").trim().isEmail().withMessage("A valid email is required"),
+];
+
 export const getProductsQueryValidator = [
   query("page")
     .optional()
