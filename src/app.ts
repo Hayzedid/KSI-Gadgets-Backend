@@ -13,34 +13,23 @@ import setupSwagger from "./docs/swagger";
 
 const app = express();
 
-const allowedOrigins = (
-  process.env.CLIENT_URL || "http://localhost:3000,http://localhost:5173"
-)
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
-
 // Security middleware
 app.use(helmet());
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow requests from Postman/curl (no Origin header) and configured client origins.
-      if (!origin || allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      return callback(new Error("Not allowed by CORS"));
-    },
-    credentials: true,
-  }),
-);
+app.use(cors());
 
 // Rate limiting
-app.use(rateLimiter);
+// app.use(rateLimiter);
 
-// Body parsing middleware
-app.use(express.json());
+// Preserve the raw request body on webhook routes BEFORE express.json()
+// consumes and discards it. Both Stripe and Paystack webhook signature
+// verification require the exact raw bytes Paystack/Stripe sent.
+app.use(
+  express.json({
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf.toString("utf8");
+    },
+  }),
+);
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 

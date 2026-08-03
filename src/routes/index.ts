@@ -6,10 +6,7 @@ import cartRoutes from "./cart.routes";
 import orderRoutes from "./order.routes";
 import paymentRoutes from "./payment.routes";
 import cryptoPaymentRoutes from "./crypto-payment.routes";
-import wishlistRoutes from "./wishlist.routes";
-import supportRoutes from "./support.routes";
-import couponRoutes from "./coupon.routes";
-import addressRoutes from "./address.routes";
+import paystackRoutes from "./paystack.routes";
 
 const router = Router();
 
@@ -21,9 +18,6 @@ router.use("/cart", cartRoutes);
 router.use("/orders", orderRoutes);
 router.use("/payments", paymentRoutes);
 router.use("/crypto-payments", cryptoPaymentRoutes);
-router.use("/wishlist", wishlistRoutes);
-router.use("/support", supportRoutes);
-router.use("/coupons", couponRoutes);
-router.use("/addresses", addressRoutes);
+router.use("/paystack", paystackRoutes);
 
 export default router;
