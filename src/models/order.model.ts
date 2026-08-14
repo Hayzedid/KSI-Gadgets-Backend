@@ -50,8 +50,14 @@ export class Order {
   @PrimaryGeneratedColumn("uuid")
   id: string;
 
-  @Column({ type: "uuid" })
-  userId: string;
+  @Column({ type: "uuid", nullable: true })
+  userId: string | null;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
+  customerEmail: string | null;
+
+  @Column({ type: "varchar", length: 100, nullable: true })
+  customerName: string | null;
 
   @Column({ type: "varchar", length: 50, unique: true })
   orderNumber: string;
@@ -67,6 +73,12 @@ export class Order {
 
   @Column({ type: "decimal", precision: 10, scale: 2, default: 0 })
   tax: number;
+
+  @Column({ type: "decimal", precision: 10, scale: 2, default: 0 })
+  discountAmount: number;
+
+  @Column({ type: "varchar", length: 50, nullable: true })
+  couponCode: string | null;
 
   @Column({ type: "decimal", precision: 10, scale: 2 })
   totalAmount: number;
@@ -125,9 +137,9 @@ export class Order {
   @Column({ type: "text", nullable: true })
   cancellationReason: string;
 
-  @ManyToOne(() => User, { onDelete: "CASCADE" })
+  @ManyToOne(() => User, { onDelete: "CASCADE", nullable: true })
   @JoinColumn({ name: "userId" })
-  user: User;
+  user: User | null;
 
   @CreateDateColumn()
   createdAt: Date;
